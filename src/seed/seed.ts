@@ -34,6 +34,21 @@ async function insertReturning<T>(query: Promise<T[]>): Promise<T> {
 
 const PROGRAMS = ["Computer Science", "Information Technology", "Data Science", "International Program"];
 
+const FORMS = [
+  {
+    title: "SIT Annual Focus Group 2025",
+    description: "Open-ended feedback from SIT students",
+    startDaysAgo: 90,
+    endDaysAgo: 0,
+  },
+  {
+    title: "SIT Annual Focus Group 2024",
+    description: "Open-ended feedback from SIT students (previous cycle)",
+    startDaysAgo: 450,
+    endDaysAgo: 360,
+  },
+];
+
 const TOPICS = [
   {
     name: "Curriculum & Course Content",
@@ -299,50 +314,55 @@ async function main() {
       .returning(),
   );
 
-  const form = await insertReturning(
-    db
-      .insert(forms)
-      .values({
-        adminId: admin.id,
-        folderId: folder.id,
-        organizationId: org.id,
-        formTitle: "SIT Annual Focus Group 2025",
-        formDescription: "Open-ended feedback from SIT students",
-        status: "active",
-        accessType: "organization_only",
-        recordName: false,
-        oneResponsePerPerson: true,
-        startDate: daysAgo(90),
-        endDate: daysAgo(0),
-        createdAt: daysAgo(90),
-      })
-      .returning(),
-  );
-
-  const programField = await insertReturning(
-    db
-      .insert(formFields)
-      .values({ formId: form.id, fieldLabel: "Program", fieldType: "radio", isRequired: true, fieldOrder: 1, createdAt: daysAgo(90) })
-      .returning(),
-  );
-
-  const programOptionIds = new Map<string, number>();
-  for (const [i, program] of PROGRAMS.entries()) {
-    const opt = await insertReturning(
+  const formContexts = [];
+  for (const f of FORMS) {
+    const form = await insertReturning(
       db
-        .insert(fieldOptions)
-        .values({ fieldId: programField.id, optionLabel: program, optionValue: program, optionOrder: i + 1, createdAt: daysAgo(90) })
+        .insert(forms)
+        .values({
+          adminId: admin.id,
+          folderId: folder.id,
+          organizationId: org.id,
+          formTitle: f.title,
+          formDescription: f.description,
+          status: "active",
+          accessType: "organization_only",
+          recordName: false,
+          oneResponsePerPerson: true,
+          startDate: daysAgo(f.startDaysAgo),
+          endDate: daysAgo(f.endDaysAgo),
+          createdAt: daysAgo(f.startDaysAgo),
+        })
         .returning(),
     );
-    programOptionIds.set(program, opt.id);
-  }
 
-  const feedbackField = await insertReturning(
-    db
-      .insert(formFields)
-      .values({ formId: form.id, fieldLabel: "Feedback", fieldType: "textarea", isRequired: true, fieldOrder: 2, createdAt: daysAgo(90) })
-      .returning(),
-  );
+    const programField = await insertReturning(
+      db
+        .insert(formFields)
+        .values({ formId: form.id, fieldLabel: "Program", fieldType: "radio", isRequired: true, fieldOrder: 1, createdAt: daysAgo(f.startDaysAgo) })
+        .returning(),
+    );
+
+    const programOptionIds = new Map<string, number>();
+    for (const [i, program] of PROGRAMS.entries()) {
+      const opt = await insertReturning(
+        db
+          .insert(fieldOptions)
+          .values({ fieldId: programField.id, optionLabel: program, optionValue: program, optionOrder: i + 1, createdAt: daysAgo(f.startDaysAgo) })
+          .returning(),
+      );
+      programOptionIds.set(program, opt.id);
+    }
+
+    const feedbackField = await insertReturning(
+      db
+        .insert(formFields)
+        .values({ formId: form.id, fieldLabel: "Feedback", fieldType: "textarea", isRequired: true, fieldOrder: 2, createdAt: daysAgo(f.startDaysAgo) })
+        .returning(),
+    );
+
+    formContexts.push({ form, programField, feedbackField, programOptionIds, startDaysAgo: f.startDaysAgo, endDaysAgo: f.endDaysAgo });
+  }
 
   const topicIds = new Map<string, number>();
   for (const topic of TOPICS) {
@@ -364,94 +384,115 @@ async function main() {
     topicIds.set(topic.name, row.id);
   }
 
-  const insertedPoints: { topicId: number | null; sentiment: Sentiment; severe: boolean }[] = [];
+  const insertedPoints: { topicId: number | null; sentiment: Sentiment; severe: boolean; ctxIndex: number }[] = [];
 
-  for (const [i, fb] of FEEDBACK.entries()) {
-    const submittedAt = daysAgo(FEEDBACK.length - i);
+  // Spread the mock submissions round-robin across the available forms so each
+  // form (and each period) ends up with its own realistic slice of feedback.
+  const feedbackChunks = formContexts.map((_, ctxIndex) => FEEDBACK.filter((_, i) => i % formContexts.length === ctxIndex));
 
-    const submission = await insertReturning(
-      db
-        .insert(submissions)
-        .values({
-          formId: form.id,
-          anonymousCode: `SIT-${String(i + 1).padStart(4, "0")}`,
-          submissionStatus: "completed",
-          createdAt: submittedAt,
-        })
-        .returning(),
-    );
+  let submissionCounter = 0;
+  for (const [ctxIndex, ctx] of formContexts.entries()) {
+    const chunk = feedbackChunks[ctxIndex]!;
+    const span = ctx.startDaysAgo - ctx.endDaysAgo;
 
-    await db.insert(answers).values({
-      submissionId: submission.id,
-      fieldId: programField.id,
-      answerOptionId: programOptionIds.get(fb.program) ?? null,
-      createdAt: submittedAt,
-    });
+    for (const [j, fb] of chunk.entries()) {
+      submissionCounter += 1;
+      const submittedAt = daysAgo(ctx.endDaysAgo + Math.floor((span * (chunk.length - j)) / chunk.length));
 
-    const answer = await insertReturning(
-      db
-        .insert(answers)
-        .values({ submissionId: submission.id, fieldId: feedbackField.id, answerText: fb.raw, createdAt: submittedAt })
-        .returning(),
-    );
-
-    for (const p of fb.points) {
-      const topicId = p.topic ? topicIds.get(p.topic) ?? null : null;
-      const severe = p.severe ?? false;
-
-      const pointRow = await insertReturning(
+      const submission = await insertReturning(
         db
-          .insert(points)
+          .insert(submissions)
           .values({
-            answerId: answer.id,
-            canonicalTopicId: topicId,
-            pointText: p.text,
-            sentimentLabel: p.sentiment,
-            isSevere: severe,
-            assignmentConfidence: topicId ? 0.75 + Math.random() * 0.24 : null,
-            processingStatus: topicId ? "assigned" : "unknown",
+            formId: ctx.form.id,
+            anonymousCode: `SIT-${String(submissionCounter).padStart(4, "0")}`,
+            submissionStatus: "completed",
             createdAt: submittedAt,
           })
           .returning(),
       );
 
-      if (!topicId) {
-        await db.insert(unassignedPoints).values({
-          pointId: pointRow.id,
-          reason: "no_matching_topic",
-          createdAt: submittedAt,
-        });
-      }
+      await db.insert(answers).values({
+        submissionId: submission.id,
+        fieldId: ctx.programField.id,
+        answerOptionId: ctx.programOptionIds.get(fb.program) ?? null,
+        createdAt: submittedAt,
+      });
 
-      insertedPoints.push({ topicId, sentiment: p.sentiment, severe });
+      const answer = await insertReturning(
+        db
+          .insert(answers)
+          .values({ submissionId: submission.id, fieldId: ctx.feedbackField.id, answerText: fb.raw, createdAt: submittedAt })
+          .returning(),
+      );
+
+      for (const p of fb.points) {
+        const topicId = p.topic ? topicIds.get(p.topic) ?? null : null;
+        const severe = p.severe ?? false;
+
+        const pointRow = await insertReturning(
+          db
+            .insert(points)
+            .values({
+              answerId: answer.id,
+              canonicalTopicId: topicId,
+              pointText: p.text,
+              sentimentLabel: p.sentiment,
+              isSevere: severe,
+              assignmentConfidence: topicId ? 0.75 + Math.random() * 0.24 : null,
+              processingStatus: topicId ? "assigned" : "unknown",
+              createdAt: submittedAt,
+            })
+            .returning(),
+        );
+
+        if (!topicId) {
+          await db.insert(unassignedPoints).values({
+            pointId: pointRow.id,
+            reason: "no_matching_topic",
+            createdAt: submittedAt,
+          });
+        }
+
+        insertedPoints.push({ topicId, sentiment: p.sentiment, severe, ctxIndex });
+      }
     }
   }
-
-  const periodStart = daysAgo(90);
-  const periodEnd = daysAgo(0);
 
   for (const topic of TOPICS) {
     const topicId = topicIds.get(topic.name);
     if (!topicId) continue;
 
     const topicPoints = insertedPoints.filter((p) => p.topicId === topicId);
-
-    await db.update(canonicalTopics).set({ topicSize: topicPoints.length, lastUpdatedAt: periodEnd }).where(eq(canonicalTopics.id, topicId));
-
-    await db.insert(topicTrends).values({
-      canonicalTopicId: topicId,
-      periodStart,
-      periodEnd,
-      feedbackCount: topicPoints.length,
-      positiveCount: topicPoints.filter((p) => p.sentiment === "positive").length,
-      neutralCount: topicPoints.filter((p) => p.sentiment === "neutral").length,
-      negativeCount: topicPoints.filter((p) => p.sentiment === "negative").length,
-      severeCount: topicPoints.filter((p) => p.severe).length,
-      createdAt: periodEnd,
-    });
+    await db.update(canonicalTopics).set({ topicSize: topicPoints.length, lastUpdatedAt: daysAgo(0) }).where(eq(canonicalTopics.id, topicId));
   }
 
-  console.log(`Seed complete: ${FEEDBACK.length} feedback submissions, ${insertedPoints.length} points, ${TOPICS.length} topics.`);
+  // One topicTrends row per topic per form period, so the dashboard has real rising/falling trend data to show.
+  for (const [ctxIndex, ctx] of formContexts.entries()) {
+    const periodStart = daysAgo(ctx.startDaysAgo);
+    const periodEnd = daysAgo(ctx.endDaysAgo);
+
+    for (const topic of TOPICS) {
+      const topicId = topicIds.get(topic.name);
+      if (!topicId) continue;
+
+      const topicPoints = insertedPoints.filter((p) => p.topicId === topicId && p.ctxIndex === ctxIndex);
+      if (topicPoints.length === 0) continue;
+
+      await db.insert(topicTrends).values({
+        canonicalTopicId: topicId,
+        periodStart,
+        periodEnd,
+        feedbackCount: topicPoints.length,
+        positiveCount: topicPoints.filter((p) => p.sentiment === "positive").length,
+        neutralCount: topicPoints.filter((p) => p.sentiment === "neutral").length,
+        negativeCount: topicPoints.filter((p) => p.sentiment === "negative").length,
+        severeCount: topicPoints.filter((p) => p.severe).length,
+        createdAt: periodEnd,
+      });
+    }
+  }
+
+  console.log(`Seed complete: ${FEEDBACK.length} feedback submissions across ${formContexts.length} forms, ${insertedPoints.length} points, ${TOPICS.length} topics.`);
 }
 
 main()
