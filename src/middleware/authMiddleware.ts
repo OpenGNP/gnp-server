@@ -1,6 +1,7 @@
 import { Elysia } from "elysia";
 
 import { authJwt, type AuthTokenPayload } from "../plugins/jwt";
+import { AUTH_COOKIE_NAME } from "../utils/cookies";
 import { unauthorized } from "../utils/errors";
 import { errorResponse } from "../utils/response";
 
@@ -29,12 +30,21 @@ const parsePayload = (payload: Record<string, unknown> | false): CurrentUser | n
   };
 };
 
+/**
+ * Prefers an explicit `Authorization: Bearer` header (API clients, mobile apps, the
+ * Scalar docs "Authorize" button) and falls back to the httpOnly auth cookie set by
+ * /auth/login and /auth/register (browser clients).
+ */
 async function resolveCurrentUser(
   jwt: { verify: (token: string) => Promise<Record<string, unknown> | false> },
   headers: Record<string, string | undefined>,
+  cookie: Record<string, { value?: unknown }>,
 ): Promise<CurrentUser | null> {
   const header = headers.authorization;
-  const token = header?.startsWith("Bearer ") ? header.slice(7) : undefined;
+  const bearerToken = header?.startsWith("Bearer ") ? header.slice(7) : undefined;
+  const cookieValue = cookie[AUTH_COOKIE_NAME]?.value;
+  const cookieToken = typeof cookieValue === "string" ? cookieValue : undefined;
+  const token = bearerToken ?? cookieToken;
 
   if (!token) return null;
 
@@ -42,11 +52,11 @@ async function resolveCurrentUser(
   return parsePayload(payload);
 }
 
-/** Derives `currentUser` (nullable) from a Bearer token. Never rejects the request. */
+/** Derives `currentUser` (nullable) from a Bearer token or the auth cookie. Never rejects the request. */
 export const optionalAuth = new Elysia({ name: "optional-auth" })
   .use(authJwt)
-  .derive({ as: "scoped" }, async ({ jwt, headers }) => ({
-    currentUser: await resolveCurrentUser(jwt, headers),
+  .derive({ as: "scoped" }, async ({ jwt, headers, cookie }) => ({
+    currentUser: await resolveCurrentUser(jwt, headers, cookie),
   }));
 
 /**
@@ -58,8 +68,8 @@ export const optionalAuth = new Elysia({ name: "optional-auth" })
  */
 export const requireAuth = new Elysia({ name: "require-auth" })
   .use(authJwt)
-  .derive({ as: "scoped" }, async ({ jwt, headers }) => ({
-    currentUser: await resolveCurrentUser(jwt, headers),
+  .derive({ as: "scoped" }, async ({ jwt, headers, cookie }) => ({
+    currentUser: await resolveCurrentUser(jwt, headers, cookie),
   }))
   .onBeforeHandle({ as: "scoped" }, ({ currentUser, status }) => {
     if (!currentUser) {

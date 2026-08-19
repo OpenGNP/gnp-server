@@ -9,7 +9,7 @@ import { errorMiddleware } from "./middleware/errorMiddleware";
 import { loggerMiddleware } from "./middleware/loggerMiddleware";
 
 const app = new Elysia()
-  .use(cors())
+  .use(cors({ origin: env.CLIENT_URL, credentials: true }))
   .use(loggerMiddleware)
   .use(errorMiddleware)
   .get("/", () => "Backend is running", { detail: { tags: ["System"], summary: "Liveness check" } })
@@ -32,4 +32,3 @@ const app = new Elysia()
   .listen(env.PORT);
 
 console.log(`Server running at http://localhost:${app.server?.port}`);
-console.log(`API docs available at http://localhost:${app.server?.port}/docs`);
