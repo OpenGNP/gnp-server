@@ -4,6 +4,8 @@ import { cors } from "@elysiajs/cors";
 import { authRoutes } from "./routes/auth";
 import { userRoutes } from "./routes/user";
 import { organizationRoutes } from "./routes/organization";
+import { folderRoutes } from "./routes/folder";
+import { formRoutes } from "./routes/form";
 
 import { databaseConfig } from "./config/database";
 import { env } from "./config/env";
@@ -31,6 +33,8 @@ const app = new Elysia()
       .use(authRoutes)
       .use(userRoutes)
       .use(organizationRoutes)
+      .use(folderRoutes)
+      .use(formRoutes)
   )
   .listen(env.PORT);
 
