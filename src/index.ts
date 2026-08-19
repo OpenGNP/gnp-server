@@ -3,6 +3,8 @@ import { cors } from "@elysiajs/cors";
 
 import { authRoutes } from "./routes/auth";
 import { userRoutes } from "./routes/user";
+import { organizationRoutes } from "./routes/organization";
+
 import { databaseConfig } from "./config/database";
 import { env } from "./config/env";
 import { errorMiddleware } from "./middleware/errorMiddleware";
@@ -28,6 +30,7 @@ const app = new Elysia()
     api
       .use(authRoutes)
       .use(userRoutes)
+      .use(organizationRoutes)
   )
   .listen(env.PORT);
 
