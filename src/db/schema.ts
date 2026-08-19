@@ -1,15 +1,14 @@
 import { pgTable, foreignKey, serial, integer, text, timestamp, vector, varchar, boolean, real } from "drizzle-orm/pg-core"
-import { sql } from "drizzle-orm"
 
-
+const nowIso = () => new Date().toISOString()
 
 export const answers = pgTable("answers", {
-	id: serial().notNull(),
+	id: serial().primaryKey(),
 	submissionId: integer("submission_id").notNull(),
 	fieldId: integer("field_id").notNull(),
 	answerText: text("answer_text"),
 	answerOptionId: integer("answer_option_id"),
-	createdAt: timestamp("created_at", { mode: 'string' }),
+	createdAt: timestamp("created_at", { mode: 'string' }).$defaultFn(nowIso),
 }, (table) => [
 	foreignKey({
 			columns: [table.submissionId],
@@ -29,7 +28,7 @@ export const answers = pgTable("answers", {
 ]);
 
 export const topicTrends = pgTable("topic_trends", {
-	id: serial().notNull(),
+	id: serial().primaryKey(),
 	canonicalTopicId: integer("canonical_topic_id").notNull(),
 	periodStart: timestamp("period_start", { mode: 'string' }),
 	periodEnd: timestamp("period_end", { mode: 'string' }),
@@ -38,7 +37,7 @@ export const topicTrends = pgTable("topic_trends", {
 	neutralCount: integer("neutral_count"),
 	negativeCount: integer("negative_count"),
 	severeCount: integer("severe_count"),
-	createdAt: timestamp("created_at", { mode: 'string' }),
+	createdAt: timestamp("created_at", { mode: 'string' }).$defaultFn(nowIso),
 }, (table) => [
 	foreignKey({
 			columns: [table.canonicalTopicId],
@@ -48,7 +47,7 @@ export const topicTrends = pgTable("topic_trends", {
 ]);
 
 export const points = pgTable("points", {
-	id: serial().notNull(),
+	id: serial().primaryKey(),
 	answerId: integer("answer_id").notNull(),
 	canonicalTopicId: integer("canonical_topic_id"),
 	pointText: text("point_text"),
@@ -57,7 +56,7 @@ export const points = pgTable("points", {
 	isSevere: boolean("is_severe"),
 	assignmentConfidence: real("assignment_confidence"),
 	processingStatus: varchar("processing_status", { length: 30 }),
-	createdAt: timestamp("created_at", { mode: 'string' }),
+	createdAt: timestamp("created_at", { mode: 'string' }).$defaultFn(nowIso),
 }, (table) => [
 	foreignKey({
 			columns: [table.answerId],
@@ -72,7 +71,7 @@ export const points = pgTable("points", {
 ]);
 
 export const canonicalTopics = pgTable("canonical_topics", {
-	id: serial().notNull(),
+	id: serial().primaryKey(),
 	canonicalName: varchar("canonical_name", { length: 255 }),
 	canonicalSummary: text("canonical_summary"),
 	representativeKeywords: text("representative_keywords"),
@@ -81,17 +80,17 @@ export const canonicalTopics = pgTable("canonical_topics", {
 	status: varchar({ length: 20 }),
 	firstDetectedAt: timestamp("first_detected_at", { mode: 'string' }),
 	lastUpdatedAt: timestamp("last_updated_at", { mode: 'string' }),
-	createdAt: timestamp("created_at", { mode: 'string' }),
+	createdAt: timestamp("created_at", { mode: 'string' }).$defaultFn(nowIso),
 });
 
 export const topicVersions = pgTable("topic_versions", {
-	id: serial().notNull(),
+	id: serial().primaryKey(),
 	canonicalTopicId: integer("canonical_topic_id").notNull(),
 	generatedTitle: varchar("generated_title", { length: 255 }),
 	generatedSummary: text("generated_summary"),
 	representativeKeywords: text("representative_keywords"),
 	modelVersion: varchar("model_version", { length: 100 }),
-	createdAt: timestamp("created_at", { mode: 'string' }),
+	createdAt: timestamp("created_at", { mode: 'string' }).$defaultFn(nowIso),
 }, (table) => [
 	foreignKey({
 			columns: [table.canonicalTopicId],
@@ -101,11 +100,11 @@ export const topicVersions = pgTable("topic_versions", {
 ]);
 
 export const unassignedPoints = pgTable("unassigned_points", {
-	id: serial().notNull(),
+	id: serial().primaryKey(),
 	pointId: integer("point_id").notNull(),
 	embedding: vector({ dimensions: 1536 }),
 	reason: varchar({ length: 100 }),
-	createdAt: timestamp("created_at", { mode: 'string' }),
+	createdAt: timestamp("created_at", { mode: 'string' }).$defaultFn(nowIso),
 }, (table) => [
 	foreignKey({
 			columns: [table.pointId],
@@ -115,7 +114,7 @@ export const unassignedPoints = pgTable("unassigned_points", {
 ]);
 
 export const aiModelRuns = pgTable("ai_model_runs", {
-	id: serial().notNull(),
+	id: serial().primaryKey(),
 	modelName: varchar("model_name", { length: 100 }),
 	modelVersion: varchar("model_version", { length: 100 }),
 	embeddingModel: varchar("embedding_model", { length: 100 }),
@@ -126,20 +125,20 @@ export const aiModelRuns = pgTable("ai_model_runs", {
 });
 
 export const organizations = pgTable("organizations", {
-	id: serial().notNull(),
+	id: serial().primaryKey(),
 	organizationName: varchar("organization_name", { length: 255 }),
 	organizationDomain: varchar("organization_domain", { length: 255 }),
-	createdAt: timestamp("created_at", { mode: 'string' }),
+	createdAt: timestamp("created_at", { mode: 'string' }).$defaultFn(nowIso),
 });
 
 export const users = pgTable("users", {
-	id: serial().notNull(),
+	id: serial().primaryKey(),
 	fullName: varchar("full_name", { length: 255 }),
 	email: varchar({ length: 255 }).notNull(),
 	password: varchar({ length: 255 }),
 	role: varchar({ length: 50 }),
 	organizationId: integer("organization_id"),
-	createdAt: timestamp("created_at", { mode: 'string' }),
+	createdAt: timestamp("created_at", { mode: 'string' }).$defaultFn(nowIso),
 }, (table) => [
 	foreignKey({
 			columns: [table.organizationId],
@@ -149,11 +148,11 @@ export const users = pgTable("users", {
 ]);
 
 export const folders = pgTable("folders", {
-	id: serial().notNull(),
+	id: serial().primaryKey(),
 	adminId: integer("admin_id").notNull(),
 	folderName: varchar("folder_name", { length: 255 }),
 	folderDescription: text("folder_description"),
-	createdAt: timestamp("created_at", { mode: 'string' }),
+	createdAt: timestamp("created_at", { mode: 'string' }).$defaultFn(nowIso),
 }, (table) => [
 	foreignKey({
 			columns: [table.adminId],
@@ -163,7 +162,7 @@ export const folders = pgTable("folders", {
 ]);
 
 export const forms = pgTable("forms", {
-	id: serial().notNull(),
+	id: serial().primaryKey(),
 	adminId: integer("admin_id").notNull(),
 	folderId: integer("folder_id"),
 	formTitle: varchar("form_title", { length: 255 }),
@@ -175,7 +174,7 @@ export const forms = pgTable("forms", {
 	organizationId: integer("organization_id"),
 	startDate: timestamp("start_date", { mode: 'string' }),
 	endDate: timestamp("end_date", { mode: 'string' }),
-	createdAt: timestamp("created_at", { mode: 'string' }),
+	createdAt: timestamp("created_at", { mode: 'string' }).$defaultFn(nowIso),
 }, (table) => [
 	foreignKey({
 			columns: [table.adminId],
@@ -195,10 +194,10 @@ export const forms = pgTable("forms", {
 ]);
 
 export const formAllowedUsers = pgTable("form_allowed_users", {
-	id: serial().notNull(),
+	id: serial().primaryKey(),
 	formId: integer("form_id").notNull(),
 	userId: integer("user_id").notNull(),
-	createdAt: timestamp("created_at", { mode: 'string' }),
+	createdAt: timestamp("created_at", { mode: 'string' }).$defaultFn(nowIso),
 }, (table) => [
 	foreignKey({
 			columns: [table.formId],
@@ -213,13 +212,13 @@ export const formAllowedUsers = pgTable("form_allowed_users", {
 ]);
 
 export const formFields = pgTable("form_fields", {
-	id: serial().notNull(),
+	id: serial().primaryKey(),
 	formId: integer("form_id").notNull(),
 	fieldLabel: varchar("field_label", { length: 255 }),
 	fieldType: varchar("field_type", { length: 30 }),
 	isRequired: boolean("is_required"),
 	fieldOrder: integer("field_order"),
-	createdAt: timestamp("created_at", { mode: 'string' }),
+	createdAt: timestamp("created_at", { mode: 'string' }).$defaultFn(nowIso),
 }, (table) => [
 	foreignKey({
 			columns: [table.formId],
@@ -229,12 +228,12 @@ export const formFields = pgTable("form_fields", {
 ]);
 
 export const fieldOptions = pgTable("field_options", {
-	id: serial().notNull(),
+	id: serial().primaryKey(),
 	fieldId: integer("field_id").notNull(),
 	optionLabel: varchar("option_label", { length: 255 }),
 	optionValue: varchar("option_value", { length: 255 }),
 	optionOrder: integer("option_order"),
-	createdAt: timestamp("created_at", { mode: 'string' }),
+	createdAt: timestamp("created_at", { mode: 'string' }).$defaultFn(nowIso),
 }, (table) => [
 	foreignKey({
 			columns: [table.fieldId],
@@ -244,12 +243,12 @@ export const fieldOptions = pgTable("field_options", {
 ]);
 
 export const submissions = pgTable("submissions", {
-	id: serial().notNull(),
+	id: serial().primaryKey(),
 	formId: integer("form_id").notNull(),
 	userId: integer("user_id"),
 	anonymousCode: varchar("anonymous_code", { length: 100 }),
 	submissionStatus: varchar("submission_status", { length: 30 }),
-	createdAt: timestamp("created_at", { mode: 'string' }),
+	createdAt: timestamp("created_at", { mode: 'string' }).$defaultFn(nowIso),
 }, (table) => [
 	foreignKey({
 			columns: [table.formId],

@@ -16,6 +16,7 @@ import {
   topicTrends,
   unassignedPoints,
 } from "../db/schema";
+import { hashPassword } from "../utils/password";
 
 const client = postgres(env.DATABASE_URL);
 const db = drizzle(client);
@@ -295,7 +296,7 @@ async function main() {
     const row = await insertReturning(
       db
         .insert(users)
-        .values({ ...u, password: "mock-hashed-password", organizationId: org.id, createdAt: daysAgo(120) })
+        .values({ ...u, password: await hashPassword("mock-hashed-password"), organizationId: org.id, createdAt: daysAgo(120) })
         .returning(),
     );
     insertedUsers.push(row);
@@ -326,7 +327,7 @@ async function main() {
           formTitle: f.title,
           formDescription: f.description,
           status: "active",
-          accessType: "organization_only",
+          accessType: "organization",
           recordName: false,
           oneResponsePerPerson: true,
           startDate: daysAgo(f.startDaysAgo),
