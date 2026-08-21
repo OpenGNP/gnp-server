@@ -33,7 +33,7 @@ const parsePayload = (payload: Record<string, unknown> | false): CurrentUser | n
 /**
  * Prefers an explicit `Authorization: Bearer` header (API clients, mobile apps, the
  * Scalar docs "Authorize" button) and falls back to the httpOnly auth cookie set by
- * /auth/login and /auth/register (browser clients).
+ * /auth/login (browser clients).
  */
 async function resolveCurrentUser(
   jwt: { verify: (token: string) => Promise<Record<string, unknown> | false> },
@@ -60,22 +60,33 @@ export const optionalAuth = new Elysia({ name: "optional-auth" })
   }));
 
 /**
- * Guards a route group: rejects with 401 when there is no authenticated user.
- *
- * Deliberately self-contained (does not internally `.use(optionalAuth)`) — chaining
+ * Builds a self-contained auth guard plugin (its own `.use(authJwt)` + `derive` +
+ * `onBeforeHandle`, all `scoped`) rather than composing guards via `.use()` — chaining
  * two separately-scoped `derive` plugins loses the inner value once a third instance
- * consumes the outer one, which is exactly the shape every route file needs here.
+ * consumes the outer one, so every guard re-derives `currentUser` itself instead of
+ * layering on top of another guard.
  */
-export const requireAuth = new Elysia({ name: "require-auth" })
-  .use(authJwt)
-  .derive({ as: "scoped" }, async ({ jwt, headers, cookie }) => ({
-    currentUser: await resolveCurrentUser(jwt, headers, cookie),
-  }))
-  .onBeforeHandle({ as: "scoped" }, ({ currentUser, status }) => {
-    if (!currentUser) {
-      return status(401, errorResponse("Unauthorized"));
-    }
-  });
+function buildGuard(name: string, allowedRoles?: string[]) {
+  return new Elysia({ name })
+    .use(authJwt)
+    .derive({ as: "scoped" }, async ({ jwt, headers, cookie }) => ({
+      currentUser: await resolveCurrentUser(jwt, headers, cookie),
+    }))
+    .onBeforeHandle({ as: "scoped" }, ({ currentUser, status }) => {
+      if (!currentUser) {
+        return status(401, errorResponse("Unauthorized"));
+      }
+      if (allowedRoles && !allowedRoles.includes(currentUser.role)) {
+        return status(403, errorResponse("Forbidden"));
+      }
+    });
+}
+
+/** Guards a route group: rejects with 401 when there is no authenticated user. */
+export const requireAuth = buildGuard("require-auth");
+
+/** Guards a route group: rejects with 401 when unauthenticated, 403 when the role isn't allowed. */
+export const requireRole = (...roles: string[]) => buildGuard(`require-role-${roles.join("-")}`, roles);
 
 /**
  * Narrows `currentUser` after a `requireAuth`-guarded handler starts running.
