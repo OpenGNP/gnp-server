@@ -13,6 +13,16 @@ import type {
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
+const nowIso = () => new Date().toISOString();
+
+/**
+ * Stamp `forms.updated_at` so "last updated" reflects edits to the form's fields
+ * and options, not just direct changes to the form row.
+ */
+async function touchForm(formId: number) {
+  await db.update(forms).set({ updatedAt: nowIso() }).where(eq(forms.id, formId));
+}
+
 async function getOwnedForm(id: number, adminId: number) {
   const [form] = await db.select().from(forms).where(eq(forms.id, id)).limit(1);
 
@@ -131,13 +141,14 @@ export const formService = {
         startDate: forms.startDate,
         endDate: forms.endDate,
         createdAt: forms.createdAt,
+        updatedAt: forms.updatedAt,
         submissionCount: count(submissions.id),
       })
       .from(forms)
       .leftJoin(submissions, eq(submissions.formId, forms.id))
       .where(and(...conditions))
       .groupBy(forms.id)
-      .orderBy(desc(forms.createdAt));
+      .orderBy(desc(forms.updatedAt));
   },
 
   async getForEdit(id: number, adminId: number) {
@@ -270,8 +281,20 @@ export const formService = {
     return db.transaction(async (tx) => {
       let updated = existing;
 
+      // Any edit here (settings or the allowed-users list) bumps updated_at.
       if (Object.keys(rest).length > 0) {
-        const [row] = await tx.update(forms).set(rest).where(eq(forms.id, id)).returning();
+        const [row] = await tx
+          .update(forms)
+          .set({ ...rest, updatedAt: nowIso() })
+          .where(eq(forms.id, id))
+          .returning();
+        updated = row!;
+      } else if (allowedEmails) {
+        const [row] = await tx
+          .update(forms)
+          .set({ updatedAt: nowIso() })
+          .where(eq(forms.id, id))
+          .returning();
         updated = row!;
       }
 
@@ -291,13 +314,13 @@ export const formService = {
   async addField(formId: number, adminId: number, input: CreateFormFieldInput) {
     await getOwnedForm(formId, adminId);
 
-    return db.transaction(async (tx) => {
+    const field = await db.transaction(async (tx) => {
       const [current] = await tx
         .select({ value: max(formFields.fieldOrder) })
         .from(formFields)
         .where(eq(formFields.formId, formId));
 
-      const [field] = await tx
+      const [inserted] = await tx
         .insert(formFields)
         .values({
           formId,
@@ -311,7 +334,7 @@ export const formService = {
       if (input.options?.length) {
         await tx.insert(fieldOptions).values(
           input.options.map((option, index) => ({
-            fieldId: field!.id,
+            fieldId: inserted!.id,
             optionLabel: option.optionLabel,
             optionValue: option.optionValue,
             optionOrder: option.optionOrder ?? index + 1,
@@ -319,8 +342,11 @@ export const formService = {
         );
       }
 
-      return field!;
+      return inserted!;
     });
+
+    await touchForm(formId);
+    return field;
   },
 
   async updateField(formId: number, fieldId: number, adminId: number, input: UpdateFormFieldInput) {
@@ -333,6 +359,7 @@ export const formService = {
     }
 
     const [updated] = await db.update(formFields).set(input).where(eq(formFields.id, fieldId)).returning();
+    await touchForm(formId);
     return updated!;
   },
 
@@ -340,6 +367,7 @@ export const formService = {
     await getOwnedForm(formId, adminId);
     await getFieldOrThrow(fieldId, formId);
     await db.delete(formFields).where(eq(formFields.id, fieldId));
+    await touchForm(formId);
   },
 
   async reorderFields(formId: number, adminId: number, fieldIds: number[]) {
@@ -363,6 +391,8 @@ export const formService = {
           .where(eq(formFields.id, fieldId));
       }
     });
+
+    await touchForm(formId);
   },
 
   async addOption(formId: number, fieldId: number, adminId: number, input: CreateFieldOptionInput) {
@@ -384,6 +414,7 @@ export const formService = {
       })
       .returning();
 
+    await touchForm(formId);
     return option!;
   },
 
@@ -392,5 +423,6 @@ export const formService = {
     await getFieldOrThrow(fieldId, formId);
     await getOptionOrThrow(optionId, fieldId);
     await db.delete(fieldOptions).where(eq(fieldOptions.id, optionId));
+    await touchForm(formId);
   },
 };
