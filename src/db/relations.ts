@@ -106,6 +106,14 @@ export const foldersRelations = relations(folders, ({one, many}) => ({
 		fields: [folders.adminId],
 		references: [users.id]
 	}),
+	parentFolder: one(folders, {
+		fields: [folders.parentFolderId],
+		references: [folders.id],
+		relationName: "folder_parent"
+	}),
+	childFolders: many(folders, {
+		relationName: "folder_parent"
+	}),
 	forms: many(forms),
 }));
 

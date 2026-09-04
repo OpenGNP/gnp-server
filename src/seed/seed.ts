@@ -23,6 +23,13 @@ const db = drizzle(client);
 
 const daysAgo = (n: number) => new Date(Date.now() - n * 24 * 60 * 60 * 1000).toISOString();
 
+const slugify = (s: string) =>
+  s
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
 async function insertReturning<T>(query: Promise<T[]>): Promise<T> {
   const [row] = await query;
   if (!row) throw new Error("Insert returned no row");
@@ -308,15 +315,18 @@ async function main() {
       .insert(folders)
       .values({
         adminId: admin.id,
+        parentFolderId: null,
         folderName: "SIT Focus Group",
         folderDescription: "Annual SIT student focus group feedback",
+        sortOrder: 0,
         createdAt: daysAgo(120),
+        updatedAt: daysAgo(120),
       })
       .returning(),
   );
 
   const formContexts = [];
-  for (const f of FORMS) {
+  for (const [formIndex, f] of FORMS.entries()) {
     const form = await insertReturning(
       db
         .insert(forms)
@@ -328,11 +338,16 @@ async function main() {
           formDescription: f.description,
           status: "active",
           accessType: "organization",
+          acceptingResponses: f.endDaysAgo === 0,
           recordName: false,
           oneResponsePerPerson: true,
+          publishedAt: daysAgo(f.startDaysAgo),
+          slug: slugify(f.title),
+          sortOrder: formIndex,
           startDate: daysAgo(f.startDaysAgo),
           endDate: daysAgo(f.endDaysAgo),
           createdAt: daysAgo(f.startDaysAgo),
+          updatedAt: daysAgo(f.endDaysAgo),
         })
         .returning(),
     );
@@ -340,7 +355,7 @@ async function main() {
     const programField = await insertReturning(
       db
         .insert(formFields)
-        .values({ formId: form.id, fieldLabel: "Program", fieldType: "radio", isRequired: true, fieldOrder: 1, createdAt: daysAgo(f.startDaysAgo) })
+        .values({ formId: form.id, fieldLabel: "Program", fieldType: "radio", section: "demographic", analyzeWithAi: false, allowOther: false, isRequired: true, fieldOrder: 1, createdAt: daysAgo(f.startDaysAgo), updatedAt: daysAgo(f.startDaysAgo) })
         .returning(),
     );
 
@@ -358,7 +373,7 @@ async function main() {
     const feedbackField = await insertReturning(
       db
         .insert(formFields)
-        .values({ formId: form.id, fieldLabel: "Feedback", fieldType: "textarea", isRequired: true, fieldOrder: 2, createdAt: daysAgo(f.startDaysAgo) })
+        .values({ formId: form.id, fieldLabel: "Feedback", fieldType: "textarea", section: "feedback", analyzeWithAi: true, allowOther: false, isRequired: true, fieldOrder: 2, createdAt: daysAgo(f.startDaysAgo), updatedAt: daysAgo(f.startDaysAgo) })
         .returning(),
     );
 

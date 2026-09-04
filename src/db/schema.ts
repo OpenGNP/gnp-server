@@ -1,8 +1,14 @@
-import { pgTable, foreignKey, serial, integer, text, timestamp, vector, varchar, boolean, real } from "drizzle-orm/pg-core"
+import { pgSchema, foreignKey, unique, serial, integer, text, timestamp, vector, varchar, uuid, boolean, real } from "drizzle-orm/pg-core"
 
 const nowIso = () => new Date().toISOString()
 
-export const answers = pgTable("answers", {
+// All application tables live in the `test` Postgres schema on the shared KMUTT
+// database (drizzle.config.ts `schemaFilter` matches). Everything reached through
+// these table objects — the app in db/client.ts and the seed script alike — is
+// automatically qualified as "test"."<table>".
+export const test = pgSchema("test");
+
+export const answers = test.table("answers", {
 	id: serial().primaryKey(),
 	submissionId: integer("submission_id").notNull(),
 	fieldId: integer("field_id").notNull(),
@@ -27,7 +33,7 @@ export const answers = pgTable("answers", {
 		}).onDelete("set null"),
 ]);
 
-export const topicTrends = pgTable("topic_trends", {
+export const topicTrends = test.table("topic_trends", {
 	id: serial().primaryKey(),
 	canonicalTopicId: integer("canonical_topic_id").notNull(),
 	periodStart: timestamp("period_start", { mode: 'string' }),
@@ -46,14 +52,14 @@ export const topicTrends = pgTable("topic_trends", {
 		}).onDelete("cascade"),
 ]);
 
-export const points = pgTable("points", {
+export const points = test.table("points", {
 	id: serial().primaryKey(),
 	answerId: integer("answer_id").notNull(),
 	canonicalTopicId: integer("canonical_topic_id"),
 	pointText: text("point_text"),
 	embedding: vector({ dimensions: 1536 }),
 	sentimentLabel: varchar("sentiment_label", { length: 20 }),
-	isSevere: boolean("is_severe"),
+	isSevere: boolean("is_severe").default(false),
 	assignmentConfidence: real("assignment_confidence"),
 	processingStatus: varchar("processing_status", { length: 30 }),
 	createdAt: timestamp("created_at", { mode: 'string' }).$defaultFn(nowIso),
@@ -70,7 +76,7 @@ export const points = pgTable("points", {
 		}).onDelete("set null"),
 ]);
 
-export const canonicalTopics = pgTable("canonical_topics", {
+export const canonicalTopics = test.table("canonical_topics", {
 	id: serial().primaryKey(),
 	canonicalName: varchar("canonical_name", { length: 255 }),
 	canonicalSummary: text("canonical_summary"),
@@ -83,7 +89,7 @@ export const canonicalTopics = pgTable("canonical_topics", {
 	createdAt: timestamp("created_at", { mode: 'string' }).$defaultFn(nowIso),
 });
 
-export const topicVersions = pgTable("topic_versions", {
+export const topicVersions = test.table("topic_versions", {
 	id: serial().primaryKey(),
 	canonicalTopicId: integer("canonical_topic_id").notNull(),
 	generatedTitle: varchar("generated_title", { length: 255 }),
@@ -99,7 +105,7 @@ export const topicVersions = pgTable("topic_versions", {
 		}).onDelete("cascade"),
 ]);
 
-export const unassignedPoints = pgTable("unassigned_points", {
+export const unassignedPoints = test.table("unassigned_points", {
 	id: serial().primaryKey(),
 	pointId: integer("point_id").notNull(),
 	embedding: vector({ dimensions: 1536 }),
@@ -111,9 +117,10 @@ export const unassignedPoints = pgTable("unassigned_points", {
 			foreignColumns: [points.id],
 			name: "fk_unassigned_point"
 		}).onDelete("cascade"),
+	unique("unassigned_points_point_id_key").on(table.pointId),
 ]);
 
-export const aiModelRuns = pgTable("ai_model_runs", {
+export const aiModelRuns = test.table("ai_model_runs", {
 	id: serial().primaryKey(),
 	modelName: varchar("model_name", { length: 100 }),
 	modelVersion: varchar("model_version", { length: 100 }),
@@ -124,14 +131,14 @@ export const aiModelRuns = pgTable("ai_model_runs", {
 	completedAt: timestamp("completed_at", { mode: 'string' }),
 });
 
-export const organizations = pgTable("organizations", {
+export const organizations = test.table("organizations", {
 	id: serial().primaryKey(),
 	organizationName: varchar("organization_name", { length: 255 }),
 	organizationDomain: varchar("organization_domain", { length: 255 }),
 	createdAt: timestamp("created_at", { mode: 'string' }).$defaultFn(nowIso),
 });
 
-export const users = pgTable("users", {
+export const users = test.table("users", {
 	id: serial().primaryKey(),
 	fullName: varchar("full_name", { length: 255 }),
 	email: varchar({ length: 255 }).notNull(),
@@ -145,36 +152,52 @@ export const users = pgTable("users", {
 			foreignColumns: [organizations.id],
 			name: "fk_user_organization"
 		}).onDelete("set null"),
+	unique("users_email_key").on(table.email),
 ]);
 
-export const folders = pgTable("folders", {
+export const folders = test.table("folders", {
 	id: serial().primaryKey(),
 	adminId: integer("admin_id").notNull(),
+	parentFolderId: integer("parent_folder_id"),
 	folderName: varchar("folder_name", { length: 255 }),
 	folderDescription: text("folder_description"),
+	sortOrder: integer("sort_order").default(0).notNull(),
 	createdAt: timestamp("created_at", { mode: 'string' }).$defaultFn(nowIso),
+	updatedAt: timestamp("updated_at", { mode: 'string' }).notNull().$defaultFn(nowIso),
 }, (table) => [
 	foreignKey({
 			columns: [table.adminId],
 			foreignColumns: [users.id],
 			name: "fk_folder_admin"
 		}).onDelete("cascade"),
+	foreignKey({
+			columns: [table.parentFolderId],
+			foreignColumns: [table.id],
+			name: "fk_folder_parent"
+		}).onDelete("cascade"),
 ]);
 
-export const forms = pgTable("forms", {
+export const forms = test.table("forms", {
 	id: serial().primaryKey(),
 	adminId: integer("admin_id").notNull(),
 	folderId: integer("folder_id"),
+	organizationId: integer("organization_id"),
 	formTitle: varchar("form_title", { length: 255 }),
 	formDescription: text("form_description"),
-	status: varchar({ length: 20 }),
-	accessType: varchar("access_type", { length: 30 }),
-	recordName: boolean("record_name"),
-	oneResponsePerPerson: boolean("one_response_per_person"),
-	organizationId: integer("organization_id"),
+	coverImageUrl: text("cover_image_url"),
+	status: varchar({ length: 20 }).default("draft").notNull(),
+	accessType: varchar("access_type", { length: 30 }).default("organization").notNull(),
+	acceptingResponses: boolean("accepting_responses").default(true).notNull(),
+	recordName: boolean("record_name").default(false),
+	oneResponsePerPerson: boolean("one_response_per_person").default(false),
+	publishedAt: timestamp("published_at", { mode: 'string' }),
+	publicToken: uuid("public_token").defaultRandom().notNull(),
+	slug: varchar({ length: 255 }),
+	sortOrder: integer("sort_order").default(0).notNull(),
 	startDate: timestamp("start_date", { mode: 'string' }),
 	endDate: timestamp("end_date", { mode: 'string' }),
 	createdAt: timestamp("created_at", { mode: 'string' }).$defaultFn(nowIso),
+	updatedAt: timestamp("updated_at", { mode: 'string' }).notNull().$defaultFn(nowIso),
 }, (table) => [
 	foreignKey({
 			columns: [table.adminId],
@@ -191,9 +214,11 @@ export const forms = pgTable("forms", {
 			foreignColumns: [organizations.id],
 			name: "fk_form_organization"
 		}).onDelete("set null"),
+	unique("uq_form_public_token").on(table.publicToken),
+	unique("uq_form_slug").on(table.slug),
 ]);
 
-export const formAllowedUsers = pgTable("form_allowed_users", {
+export const formAllowedUsers = test.table("form_allowed_users", {
 	id: serial().primaryKey(),
 	formId: integer("form_id").notNull(),
 	userId: integer("user_id").notNull(),
@@ -209,16 +234,21 @@ export const formAllowedUsers = pgTable("form_allowed_users", {
 			foreignColumns: [users.id],
 			name: "fk_allowed_user"
 		}).onDelete("cascade"),
+	unique("form_allowed_users_form_id_user_id_key").on(table.formId, table.userId),
 ]);
 
-export const formFields = pgTable("form_fields", {
+export const formFields = test.table("form_fields", {
 	id: serial().primaryKey(),
 	formId: integer("form_id").notNull(),
 	fieldLabel: varchar("field_label", { length: 255 }),
 	fieldType: varchar("field_type", { length: 30 }),
-	isRequired: boolean("is_required"),
+	section: varchar({ length: 20 }).default("feedback").notNull(),
+	analyzeWithAi: boolean("analyze_with_ai").default(false).notNull(),
+	allowOther: boolean("allow_other").default(false).notNull(),
+	isRequired: boolean("is_required").default(false),
 	fieldOrder: integer("field_order"),
 	createdAt: timestamp("created_at", { mode: 'string' }).$defaultFn(nowIso),
+	updatedAt: timestamp("updated_at", { mode: 'string' }).notNull().$defaultFn(nowIso),
 }, (table) => [
 	foreignKey({
 			columns: [table.formId],
@@ -227,7 +257,7 @@ export const formFields = pgTable("form_fields", {
 		}).onDelete("cascade"),
 ]);
 
-export const fieldOptions = pgTable("field_options", {
+export const fieldOptions = test.table("field_options", {
 	id: serial().primaryKey(),
 	fieldId: integer("field_id").notNull(),
 	optionLabel: varchar("option_label", { length: 255 }),
@@ -242,11 +272,12 @@ export const fieldOptions = pgTable("field_options", {
 		}).onDelete("cascade"),
 ]);
 
-export const submissions = pgTable("submissions", {
+export const submissions = test.table("submissions", {
 	id: serial().primaryKey(),
 	formId: integer("form_id").notNull(),
 	userId: integer("user_id"),
 	anonymousCode: varchar("anonymous_code", { length: 100 }),
+	respondentName: varchar("respondent_name", { length: 255 }),
 	submissionStatus: varchar("submission_status", { length: 30 }),
 	createdAt: timestamp("created_at", { mode: 'string' }).$defaultFn(nowIso),
 }, (table) => [
