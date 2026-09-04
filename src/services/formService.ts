@@ -7,6 +7,7 @@ import type {
   CreateFieldOptionInput,
   CreateFormFieldInput,
   CreateFormInput,
+  FormFieldInput,
   UpdateFormFieldInput,
   UpdateFormInput,
 } from "../validators/formValidator";
@@ -14,6 +15,36 @@ import type {
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 const nowIso = () => new Date().toISOString();
+
+/** Insert a list of fields (with their options) for a form, in the given order. */
+async function insertFields(tx: Tx, formId: number, fields: FormFieldInput[]) {
+  for (const [index, field] of fields.entries()) {
+    const [insertedField] = await tx
+      .insert(formFields)
+      .values({
+        formId,
+        fieldLabel: field.fieldLabel,
+        fieldType: field.fieldType,
+        section: field.section,
+        isRequired: field.isRequired,
+        analyzeWithAi: field.analyzeWithAi,
+        allowOther: field.allowOther,
+        fieldOrder: field.fieldOrder ?? index + 1,
+      })
+      .returning();
+
+    if (field.options?.length) {
+      await tx.insert(fieldOptions).values(
+        field.options.map((option, optionIndex) => ({
+          fieldId: insertedField!.id,
+          optionLabel: option.optionLabel,
+          optionValue: option.optionValue,
+          optionOrder: option.optionOrder ?? optionIndex + 1,
+        })),
+      );
+    }
+  }
+}
 
 /**
  * Stamp `forms.updated_at` so "last updated" reflects edits to the form's fields
@@ -237,29 +268,7 @@ export const formService = {
         })
         .returning();
 
-      for (const [index, field] of input.fields.entries()) {
-        const [insertedField] = await tx
-          .insert(formFields)
-          .values({
-            formId: form!.id,
-            fieldLabel: field.fieldLabel,
-            fieldType: field.fieldType,
-            isRequired: field.isRequired,
-            fieldOrder: field.fieldOrder ?? index + 1,
-          })
-          .returning();
-
-        if (field.options?.length) {
-          await tx.insert(fieldOptions).values(
-            field.options.map((option, optionIndex) => ({
-              fieldId: insertedField!.id,
-              optionLabel: option.optionLabel,
-              optionValue: option.optionValue,
-              optionOrder: option.optionOrder ?? optionIndex + 1,
-            })),
-          );
-        }
-      }
+      await insertFields(tx, form!.id, input.fields);
 
       if (input.accessType === "specific" && input.allowedEmails?.length) {
         await syncAllowedUsers(tx, form!.id, admin.organizationId, input.allowedEmails);
@@ -276,12 +285,12 @@ export const formService = {
       await assertFolderOwnership(input.folderId, admin.id);
     }
 
-    const { allowedEmails, ...rest } = input;
+    const { allowedEmails, fields, ...rest } = input;
 
     return db.transaction(async (tx) => {
       let updated = existing;
 
-      // Any edit here (settings or the allowed-users list) bumps updated_at.
+      // Any edit here (settings, the field list, or the allowed-users list) bumps updated_at.
       if (Object.keys(rest).length > 0) {
         const [row] = await tx
           .update(forms)
@@ -289,13 +298,30 @@ export const formService = {
           .where(eq(forms.id, id))
           .returning();
         updated = row!;
-      } else if (allowedEmails) {
+      } else if (allowedEmails || fields) {
         const [row] = await tx
           .update(forms)
           .set({ updatedAt: nowIso() })
           .where(eq(forms.id, id))
           .returning();
         updated = row!;
+      }
+
+      if (fields) {
+        const [tally] = await tx
+          .select({ value: count(submissions.id) })
+          .from(submissions)
+          .where(eq(submissions.formId, id));
+
+        if ((tally?.value ?? 0) > 0) {
+          throw badRequest(
+            "This form already has responses, so its questions can no longer be changed. Duplicate it to start a new version.",
+          );
+        }
+
+        // Replace the whole field list. Options cascade-delete with their field.
+        await tx.delete(formFields).where(eq(formFields.formId, id));
+        await insertFields(tx, id, fields);
       }
 
       if (allowedEmails) {
@@ -326,7 +352,10 @@ export const formService = {
           formId,
           fieldLabel: input.fieldLabel,
           fieldType: input.fieldType,
+          section: input.section,
           isRequired: input.isRequired,
+          analyzeWithAi: input.analyzeWithAi,
+          allowOther: input.allowOther,
           fieldOrder: input.fieldOrder ?? (current?.value ?? 0) + 1,
         })
         .returning();

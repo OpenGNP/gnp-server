@@ -77,7 +77,18 @@ const adminFormRoutes = new Elysia()
       const data = await formController.update(id, currentUser, body);
       return successResponse("Form updated successfully", data);
     },
-    { body: updateFormSchema, detail: { tags, security, summary: "Update a form's settings" } },
+    {
+      body: updateFormSchema,
+      detail: {
+        tags,
+        security,
+        summary: "Update a form's settings, and optionally replace its fields",
+        description:
+          "Any provided `fields` array replaces the form's entire field list (and their options) in one " +
+          "transaction. Refused with 400 once the form has responses, so editing unrelated settings never " +
+          "cascade-deletes answers.",
+      },
+    },
   )
   .delete(
     "/:id",
