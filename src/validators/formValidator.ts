@@ -6,6 +6,10 @@ const dateStringSchema = z
   .refine((value) => !Number.isNaN(Date.parse(value)), { message: "Invalid date" })
   .transform((value) => new Date(value).toISOString());
 
+// Update-only: lets a caller explicitly clear a previously-set start/end date.
+// Create has nothing to clear, so it stays on the plain (non-nullable) schema above.
+const nullableDateStringSchema = z.union([dateStringSchema, z.null()]);
+
 // These mirror the DB-level CHECK constraints (chk_access_type, chk_form_status,
 // chk_field_type) which are not visible in the introspected schema.ts. `status`:
 // draft = created, never published; active = published & visible (public link
@@ -40,6 +44,7 @@ export const createFormSchema = z.object({
   formDescription: z.string().trim().max(2000).optional(),
   status: formStatusEnum.default("draft"),
   accessType: formAccessTypeEnum.default("organization"),
+  acceptingResponses: z.boolean().default(true),
   recordName: z.boolean().default(false),
   oneResponsePerPerson: z.boolean().default(false),
   startDate: dateStringSchema.optional(),
@@ -63,10 +68,11 @@ export const updateFormSchema = z.object({
   formDescription: z.string().trim().max(2000).optional(),
   status: formStatusEnum.optional(),
   accessType: formAccessTypeEnum.optional(),
+  acceptingResponses: z.boolean().optional(),
   recordName: z.boolean().optional(),
   oneResponsePerPerson: z.boolean().optional(),
-  startDate: dateStringSchema.optional(),
-  endDate: dateStringSchema.optional(),
+  startDate: nullableDateStringSchema.optional(),
+  endDate: nullableDateStringSchema.optional(),
   fields: z.array(formFieldSchema).optional(),
   allowedEmails: z.array(z.email()).optional(),
 });

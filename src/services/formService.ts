@@ -234,6 +234,10 @@ export const formService = {
     if (form.status !== "active") throw notFound("Form not found");
     assertAccessible(form, viewer);
 
+    if (!form.acceptingResponses) {
+      throw forbidden("This form is not currently accepting responses");
+    }
+
     const now = Date.now();
     if (form.startDate && now < Date.parse(form.startDate)) {
       throw forbidden("This form is not yet accepting responses");
@@ -261,6 +265,7 @@ export const formService = {
           formDescription: input.formDescription,
           status: input.status,
           accessType: input.accessType,
+          acceptingResponses: input.acceptingResponses,
           recordName: input.recordName,
           oneResponsePerPerson: input.oneResponsePerPerson,
           startDate: input.startDate,
