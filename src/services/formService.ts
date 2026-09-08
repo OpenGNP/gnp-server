@@ -221,6 +221,7 @@ export const formService = {
       formTitle: form.formTitle,
       formDescription: form.formDescription,
       accessType: form.accessType,
+      acceptingResponses: form.acceptingResponses,
       recordName: form.recordName,
       startDate: form.startDate,
       endDate: form.endDate,
