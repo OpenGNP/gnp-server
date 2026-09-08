@@ -44,7 +44,7 @@ export const createFormSchema = z.object({
   formDescription: z.string().trim().max(2000).optional(),
   status: formStatusEnum.default("draft"),
   accessType: formAccessTypeEnum.default("organization"),
-  acceptingResponses: z.boolean().default(true),
+  acceptingResponses: z.boolean().default(false),
   recordName: z.boolean().default(false),
   oneResponsePerPerson: z.boolean().default(false),
   startDate: dateStringSchema.optional(),
