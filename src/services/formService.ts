@@ -16,6 +16,15 @@ type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 const nowIso = () => new Date().toISOString();
 
+/**
+ * `forms.start_date` / `end_date` are `timestamp` (no time zone) columns and come back
+ * zone-less ("2026-06-08 02:55:00"). Writes go in as UTC (`dateStringSchema` →
+ * `.toISOString()`), so parse them back as UTC — `Date.parse` on a zone-less string
+ * uses the process's local zone, which need not be UTC.
+ */
+const parseStoredTimestamp = (value: string): number =>
+  Date.parse(/Z$|[+-]\d\d(:?\d\d)?$/.test(value) ? value : `${value.replace(" ", "T")}Z`);
+
 /** Insert a list of fields (with their options) for a form, in the given order. */
 async function insertFields(tx: Tx, formId: number, fields: FormFieldInput[]) {
   for (const [index, field] of fields.entries()) {
@@ -241,10 +250,10 @@ export const formService = {
     }
 
     const now = Date.now();
-    if (form.startDate && now < Date.parse(form.startDate)) {
+    if (form.startDate && now < parseStoredTimestamp(form.startDate)) {
       throw forbidden("This form is not yet accepting responses");
     }
-    if (form.endDate && now > Date.parse(form.endDate)) {
+    if (form.endDate && now > parseStoredTimestamp(form.endDate)) {
       throw forbidden("This form is no longer accepting responses");
     }
 
