@@ -33,6 +33,10 @@ export const formController = {
     return formService.remove(id, adminId);
   },
 
+  reorderForms(adminId: number, folderId: number | null, formIds: number[]) {
+    return formService.reorderForms(adminId, folderId, formIds);
+  },
+
   addField(formId: number, adminId: number, input: CreateFormFieldInput) {
     return formService.addField(formId, adminId, input);
   },

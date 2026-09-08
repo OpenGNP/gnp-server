@@ -1,4 +1,4 @@
-import { and, count, desc, eq, inArray, max } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNull, max } from "drizzle-orm";
 
 import { db, fieldOptions, folders, formAllowedUsers, formFields, forms, submissions, users } from "../db/client";
 import type { CurrentUser } from "../middleware/authMiddleware";
@@ -169,6 +169,7 @@ export const formService = {
         status: forms.status,
         accessType: forms.accessType,
         folderId: forms.folderId,
+        sortOrder: forms.sortOrder,
         startDate: forms.startDate,
         endDate: forms.endDate,
         createdAt: forms.createdAt,
@@ -254,12 +255,22 @@ export const formService = {
       await assertFolderOwnership(input.folderId, admin.id);
     }
 
+    const folderId = input.folderId ?? null;
+    const folderCondition = folderId === null ? isNull(forms.folderId) : eq(forms.folderId, folderId);
+
     return db.transaction(async (tx) => {
+      // New forms append to the end of whatever container (folder or root) they land
+      // in, same "current max + 1" pattern as fieldOrder/optionOrder below.
+      const [current] = await tx
+        .select({ value: max(forms.sortOrder) })
+        .from(forms)
+        .where(and(eq(forms.adminId, admin.id), folderCondition));
+
       const [form] = await tx
         .insert(forms)
         .values({
           adminId: admin.id,
-          folderId: input.folderId ?? null,
+          folderId,
           organizationId: admin.organizationId,
           formTitle: input.formTitle,
           formDescription: input.formDescription,
@@ -270,6 +281,7 @@ export const formService = {
           oneResponsePerPerson: input.oneResponsePerPerson,
           startDate: input.startDate,
           endDate: input.endDate,
+          sortOrder: (current?.value ?? -1) + 1,
         })
         .returning();
 
@@ -427,6 +439,32 @@ export const formService = {
     });
 
     await touchForm(formId);
+  },
+
+  /**
+   * Reorders one container's worth of sidebar siblings (a folder's forms, or the
+   * folder-less ones at root). Deliberately does NOT call touchForm — a drag-reorder
+   * isn't a content change, and bumping updated_at here would scramble Home's
+   * "recent forms" (sorted by updated_at) every time someone reorders the sidebar.
+   */
+  async reorderForms(adminId: number, folderId: number | null, formIds: number[]) {
+    const folderCondition = folderId === null ? isNull(forms.folderId) : eq(forms.folderId, folderId);
+
+    const existingForms = await db
+      .select({ id: forms.id })
+      .from(forms)
+      .where(and(eq(forms.adminId, adminId), folderCondition));
+    const existingIds = new Set(existingForms.map((form) => form.id));
+
+    if (formIds.length !== existingIds.size || !formIds.every((id) => existingIds.has(id))) {
+      throw badRequest("formIds must match the forms currently in that folder exactly");
+    }
+
+    await db.transaction(async (tx) => {
+      for (const [index, formId] of formIds.entries()) {
+        await tx.update(forms).set({ sortOrder: index }).where(eq(forms.id, formId));
+      }
+    });
   },
 
   async addOption(formId: number, fieldId: number, adminId: number, input: CreateFieldOptionInput) {

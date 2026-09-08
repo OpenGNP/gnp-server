@@ -21,4 +21,8 @@ export const folderController = {
   remove(id: number, adminId: number) {
     return folderService.remove(id, adminId);
   },
+
+  reorderFolders(adminId: number, folderIds: number[]) {
+    return folderService.reorderFolders(adminId, folderIds);
+  },
 };

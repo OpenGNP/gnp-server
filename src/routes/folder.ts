@@ -4,7 +4,7 @@ import { folderController } from "../controllers/folderController";
 import { assertCurrentUser, requireAuth } from "../middleware/authMiddleware";
 import { parseIntParam } from "../utils/params";
 import { successResponse } from "../utils/response";
-import { createFolderSchema, updateFolderSchema } from "../validators/folderValidator";
+import { createFolderSchema, reorderFoldersSchema, updateFolderSchema } from "../validators/folderValidator";
 
 const tags = ["Folders"];
 const security = [{ bearerAuth: [] }];
@@ -59,4 +59,21 @@ export const folderRoutes = new Elysia({ prefix: "/folders" })
       return successResponse("Folder deleted successfully", null);
     },
     { detail: { tags, security, summary: "Delete a folder" } },
+  )
+  .patch(
+    "/reorder",
+    async ({ body, currentUser }) => {
+      assertCurrentUser(currentUser);
+      await folderController.reorderFolders(currentUser.id, body.folderIds);
+      return successResponse("Folders reordered successfully", null);
+    },
+    {
+      body: reorderFoldersSchema,
+      detail: {
+        tags,
+        security,
+        summary: "Reorder my top-level folders",
+        description: "folderIds must match exactly the folders you currently have.",
+      },
+    },
   );

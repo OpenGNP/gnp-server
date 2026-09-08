@@ -9,6 +9,7 @@ import {
   createFormFieldSchema,
   createFormSchema,
   reorderFieldsSchema,
+  reorderFormsSchema,
   updateFormFieldSchema,
   updateFormSchema,
 } from "../validators/formValidator";
@@ -99,6 +100,25 @@ const adminFormRoutes = new Elysia()
       return successResponse("Form deleted successfully", null);
     },
     { detail: { tags, security, summary: "Delete a form" } },
+  )
+  .patch(
+    "/reorder",
+    async ({ body, currentUser }) => {
+      assertCurrentUser(currentUser);
+      await formController.reorderForms(currentUser.id, body.folderId, body.formIds);
+      return successResponse("Forms reordered successfully", null);
+    },
+    {
+      body: reorderFormsSchema,
+      detail: {
+        tags,
+        security,
+        summary: "Reorder my forms within a folder (or at the root)",
+        description:
+          "formIds must match exactly the forms currently in that folder (folderId: null for root) — same " +
+          "all-or-nothing semantics as field reordering. Never bumps updated_at.",
+      },
+    },
   )
   .post(
     "/:id/fields",

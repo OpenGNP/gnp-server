@@ -1,7 +1,7 @@
-import { count, desc, eq } from "drizzle-orm";
+import { count, desc, eq, max } from "drizzle-orm";
 
 import { db, folders, forms } from "../db/client";
-import { forbidden, notFound } from "../utils/errors";
+import { badRequest, forbidden, notFound } from "../utils/errors";
 import type { CreateFolderInput, UpdateFolderInput } from "../validators/folderValidator";
 
 async function getOwnedFolder(id: number, adminId: number) {
@@ -20,6 +20,7 @@ export const folderService = {
         id: folders.id,
         folderName: folders.folderName,
         folderDescription: folders.folderDescription,
+        sortOrder: folders.sortOrder,
         createdAt: folders.createdAt,
         formCount: count(forms.id),
       })
@@ -48,12 +49,20 @@ export const folderService = {
   },
 
   async create(adminId: number, input: CreateFolderInput) {
+    // New folders append to the end of the (flat, top-level) list — same "current
+    // max + 1" pattern as forms.sortOrder.
+    const [current] = await db
+      .select({ value: max(folders.sortOrder) })
+      .from(folders)
+      .where(eq(folders.adminId, adminId));
+
     const [folder] = await db
       .insert(folders)
       .values({
         adminId,
         folderName: input.folderName,
         folderDescription: input.folderDescription,
+        sortOrder: (current?.value ?? -1) + 1,
       })
       .returning();
 
@@ -71,5 +80,21 @@ export const folderService = {
   async remove(id: number, adminId: number) {
     await getOwnedFolder(id, adminId);
     await db.delete(folders).where(eq(folders.id, id));
+  },
+
+  /** Reorders the admin's top-level folders. Folders aren't nested in the API, so this is the whole list. */
+  async reorderFolders(adminId: number, folderIds: number[]) {
+    const existingFolders = await db.select({ id: folders.id }).from(folders).where(eq(folders.adminId, adminId));
+    const existingIds = new Set(existingFolders.map((folder) => folder.id));
+
+    if (folderIds.length !== existingIds.size || !folderIds.every((id) => existingIds.has(id))) {
+      throw badRequest("folderIds must match your folders exactly");
+    }
+
+    await db.transaction(async (tx) => {
+      for (const [index, folderId] of folderIds.entries()) {
+        await tx.update(folders).set({ sortOrder: index }).where(eq(folders.id, folderId));
+      }
+    });
   },
 };

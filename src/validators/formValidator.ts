@@ -95,9 +95,20 @@ export const reorderFieldsSchema = z.object({
   fieldIds: z.array(z.number().int().positive()).min(1),
 });
 
+// Reorders the sidebar's sibling list within one container — `folderId: null` means
+// root. `formIds` must be the exact set of forms this admin currently has in that
+// container (same all-or-nothing semantics as reorderFieldsSchema above); this never
+// touches `updated_at`, since a drag-reorder isn't a content change and shouldn't
+// bump a form to the top of "recent forms".
+export const reorderFormsSchema = z.object({
+  folderId: z.number().int().positive().nullable(),
+  formIds: z.array(z.number().int().positive()).min(1),
+});
+
 export type CreateFormInput = z.infer<typeof createFormSchema>;
 export type UpdateFormInput = z.infer<typeof updateFormSchema>;
 export type CreateFormFieldInput = z.infer<typeof createFormFieldSchema>;
 export type UpdateFormFieldInput = z.infer<typeof updateFormFieldSchema>;
 export type CreateFieldOptionInput = z.infer<typeof createFieldOptionSchema>;
 export type FormFieldInput = z.infer<typeof formFieldSchema>;
+export type ReorderFormsInput = z.infer<typeof reorderFormsSchema>;
