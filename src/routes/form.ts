@@ -18,19 +18,19 @@ const tags = ["Forms"];
 const security = [{ bearerAuth: [] }];
 
 const publicFormRoutes = new Elysia().use(optionalAuth).get(
-  "/:id/public",
+  "/public/:token",
   async ({ params, currentUser }) => {
-    const id = parseIntParam(params.id, "form id");
-    const data = await formController.getPublic(id, currentUser);
+    const data = await formController.getPublicByToken(params.token, currentUser);
     return successResponse("Form loaded successfully", data);
   },
   {
     detail: {
       tags,
-      summary: "Get the respondent-facing view of a form",
+      summary: "Get the respondent-facing view of a form by its public token",
       description:
-        "Enforces the form's status and accessType. An optional Bearer token is used to check " +
-        "organization/specific-people access, but is not required for public forms.",
+        "Looked up by the form's unguessable public token (not its id), so a shared link can't be " +
+        "enumerated. Enforces status and accessType; an optional Bearer token checks " +
+        "organization/specific-people access but isn't required for public forms.",
     },
   },
 );

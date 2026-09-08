@@ -17,8 +17,8 @@ export const formController = {
     return formService.getForEdit(id, adminId);
   },
 
-  getPublic(id: number, viewer: CurrentUser | null) {
-    return formService.getPublic(id, viewer);
+  getPublicByToken(token: string, viewer: CurrentUser | null) {
+    return formService.getPublicByToken(token, viewer);
   },
 
   create(admin: CurrentUser, input: CreateFormInput) {

@@ -1,4 +1,4 @@
-import { and, count, desc, eq, inArray, isNull, max } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNull, max, type SQL } from "drizzle-orm";
 
 import { db, fieldOptions, folders, formAllowedUsers, formFields, forms, submissions, users } from "../db/client";
 import type { CurrentUser } from "../middleware/authMiddleware";
@@ -112,9 +112,9 @@ async function syncAllowedUsers(tx: Tx, formId: number, organizationId: number |
   await tx.insert(formAllowedUsers).values(matchedUsers.map((user) => ({ formId, userId: user.id })));
 }
 
-async function loadFormForViewer(id: number) {
+async function loadFormForViewer(where: SQL) {
   const form = await db.query.forms.findFirst({
-    where: eq(forms.id, id),
+    where,
     with: {
       formFields: {
         orderBy: (fields, { asc }) => [asc(fields.fieldOrder)],
@@ -219,8 +219,13 @@ export const formService = {
     return form!;
   },
 
-  async getPublic(id: number, viewer: CurrentUser | null) {
-    const form = await loadFormForViewer(id);
+  /**
+   * Respondent-facing view, looked up by the form's unguessable `publicToken` (not its
+   * sequential id) so a shared link can't be enumerated. Still returns the numeric
+   * `id` — a respondent needs it to POST their answers.
+   */
+  async getPublicByToken(token: string, viewer: CurrentUser | null) {
+    const form = await loadFormForViewer(eq(forms.publicToken, token));
 
     if (form.status !== "active") throw notFound("Form not found");
     assertAccessible(form, viewer);
@@ -238,9 +243,9 @@ export const formService = {
     };
   },
 
-  /** Same access rules as `getPublic`, plus the accepting-responses window. Used by submission intake. */
+  /** Same access rules as `getPublicByToken`, plus the accepting-responses window. Used by submission intake. */
   async getFormForSubmission(id: number, viewer: CurrentUser | null) {
-    const form = await loadFormForViewer(id);
+    const form = await loadFormForViewer(eq(forms.id, id));
 
     if (form.status !== "active") throw notFound("Form not found");
     assertAccessible(form, viewer);
