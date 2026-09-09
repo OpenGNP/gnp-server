@@ -4,6 +4,8 @@ import { db, folders, forms } from "../db/client";
 import { badRequest, forbidden, notFound } from "../utils/errors";
 import type { CreateFolderInput, UpdateFolderInput } from "../validators/folderValidator";
 
+const nowIso = () => new Date().toISOString();
+
 async function getOwnedFolder(id: number, adminId: number) {
   const [folder] = await db.select().from(folders).where(eq(folders.id, id)).limit(1);
 
@@ -22,6 +24,7 @@ export const folderService = {
         folderDescription: folders.folderDescription,
         sortOrder: folders.sortOrder,
         createdAt: folders.createdAt,
+        updatedAt: folders.updatedAt,
         formCount: count(forms.id),
       })
       .from(folders)
@@ -72,7 +75,13 @@ export const folderService = {
   async update(id: number, adminId: number, input: UpdateFolderInput) {
     await getOwnedFolder(id, adminId);
 
-    const [updated] = await db.update(folders).set(input).where(eq(folders.id, id)).returning();
+    // Stamp updated_at ($defaultFn only fires on insert) so "date modified" moves on
+    // rename. reorderFolders deliberately does NOT — a drag isn't a content change.
+    const [updated] = await db
+      .update(folders)
+      .set({ ...input, updatedAt: nowIso() })
+      .where(eq(folders.id, id))
+      .returning();
 
     return updated!;
   },
