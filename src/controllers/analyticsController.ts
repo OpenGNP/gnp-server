@@ -8,4 +8,8 @@ export const analyticsController = {
   trends(limit?: number) {
     return analyticsService.trends(limit);
   },
+
+  formResponses(formId: number, adminId: number) {
+    return analyticsService.formResponses(formId, adminId);
+  },
 };

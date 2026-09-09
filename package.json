@@ -7,6 +7,7 @@
     "dev": "bun --watch src/index.ts",
     "start": "bun src/index.ts",
     "seed": "bun run src/seed/seed.ts",
+    "seed:dashboard": "bun run src/seed/dashboardSeed.ts",
     "generate": "bunx drizzle-kit generate",
     "pull": "bunx drizzle-kit pull",
     "push": "bunx drizzle-kit push"
