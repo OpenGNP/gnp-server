@@ -40,13 +40,23 @@ export const analyticsRoutes = new Elysia({ prefix: "/analytics" })
   )
   .get(
     "/forms/:id/themes",
-    async ({ params, currentUser }) => {
+    async ({ params, query, currentUser }) => {
       assertCurrentUser(currentUser);
       const id = parseIntParam(params.id, "form id");
-      const data = await analyticsController.formThemes(id, currentUser.id);
+      const data = await analyticsController.formThemes(id, currentUser.id, {
+        from: typeof query.from === "string" ? query.from : undefined,
+        to: typeof query.to === "string" ? query.to : undefined,
+      });
       return successResponse("Form theme analytics loaded successfully", data);
     },
-    { detail: { tags, security, summary: "Topic / sentiment analysis for one form (Themes tab)" } },
+    {
+      detail: {
+        tags,
+        security,
+        summary: "Topic / sentiment analysis for one form (Themes tab)",
+        description: "Query: from / to (ISO dates) — defaults to the span of the form's analysed feedback.",
+      },
+    },
   )
   .get(
     "/forms/:id/trend",

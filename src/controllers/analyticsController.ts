@@ -19,8 +19,15 @@ export const analyticsController = {
     return analyticsService.formResponses(formId, adminId);
   },
 
-  formThemes(formId: number, adminId: number) {
-    return analyticsService.formThemes(formId, adminId);
+  formThemes(
+    formId: number,
+    adminId: number,
+    query: { from?: string; to?: string } = {},
+  ) {
+    return analyticsService.formThemes(formId, adminId, {
+      from: parseMs(query.from),
+      to: parseMs(query.to),
+    });
   },
 
   formTrend(

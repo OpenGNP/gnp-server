@@ -1,4 +1,4 @@
-import { and, count, countDistinct, desc, eq, gte, inArray, isNotNull, lte, max } from "drizzle-orm";
+import { and, count, countDistinct, desc, eq, gte, inArray, isNotNull, lte, max, min } from "drizzle-orm";
 
 import {
   answers,
@@ -106,6 +106,37 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 /** Zone-less DB timestamp → epoch ms, read as UTC (columns are `timestamp` without tz). */
 const parseTs = (value: string): number =>
   Date.parse(/Z$|[+-]\d\d(:?\d\d)?$/.test(value) ? value : `${value.replace(" ", "T")}Z`);
+
+/** Short UTC date for range labels, e.g. "8 Jun 2026". */
+const fmtDateUTC = (t: number): string =>
+  new Date(t).toLocaleDateString("en-US", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+
+/**
+ * Default analytics window for a form (Trend + Themes tabs share this): the span of
+ * its analysed feedback, first mention → last mention, so the tab opens on *all*
+ * feedback. Deliberately NOT the form's start/end date — an admin can edit those
+ * after responses land. Falls back to a trailing 90 days when the form has no
+ * analysed feedback yet. Explicit from/to (epoch ms) win; a degenerate/inverted
+ * result is widened to 90 days.
+ */
+function resolveFeedbackWindow(
+  opts: { from?: number; to?: number },
+  earliestMs: number,
+  latestMs: number,
+): { from: number; to: number; span: number } {
+  const DEFAULT_SPAN = 90 * DAY_MS;
+  const defaultTo = Number.isFinite(latestMs) ? latestMs : Date.now();
+  const defaultFrom = Number.isFinite(earliestMs) ? earliestMs : defaultTo - DEFAULT_SPAN;
+  const to = Number.isFinite(opts.to) ? (opts.to as number) : defaultTo;
+  let from = Number.isFinite(opts.from) ? (opts.from as number) : defaultFrom;
+  if (!(from < to)) from = to - DEFAULT_SPAN;
+  return { from, to, span: Math.max(DAY_MS, to - from) };
+}
 
 const TREND_BUCKETS: readonly TrendBucket[] = ["day", "week", "month", "year"];
 export const isTrendBucket = (v: string | undefined): v is TrendBucket =>
@@ -379,13 +410,41 @@ export const analyticsService = {
    * keywords, and a demographic-tagged sample of feedback points), and the
    * high-intensity subset. Trend line in the detail panel is synthetic client-side.
    */
-  async formThemes(formId: number, adminId: number) {
+  async formThemes(
+    formId: number,
+    adminId: number,
+    opts: { from?: number; to?: number } = {},
+  ) {
     const form = await assertFormOwner(formId, adminId);
+
+    // Resolve the analysis window the same way the Trend tab does: default to the
+    // span of this form's analysed feedback, explicit from/to win.
+    const [allTime] = await db
+      .select({
+        value: count(),
+        earliest: min(submissions.createdAt),
+        latest: max(submissions.createdAt),
+      })
+      .from(points)
+      .innerJoin(answers, eq(points.answerId, answers.id))
+      .innerJoin(submissions, eq(answers.submissionId, submissions.id))
+      .where(and(eq(submissions.formId, formId), isNotNull(points.canonicalTopicId)));
+    const totalMentions = allTime?.value ?? 0;
+    const earliestMs = allTime?.earliest ? parseTs(allTime.earliest) : NaN;
+    const latestMs = allTime?.latest ? parseTs(allTime.latest) : NaN;
+    const { from, to } = resolveFeedbackWindow(opts, earliestMs, latestMs);
+    const fromIso = new Date(from).toISOString();
+    const toIso = new Date(to).toISOString();
+    const rangeLabel = `${fmtDateUTC(from)} – ${fmtDateUTC(to)}`;
+    const inWindow = and(
+      gte(submissions.createdAt, fromIso),
+      lte(submissions.createdAt, toIso),
+    );
 
     const [totals] = await db
       .select({ value: count() })
       .from(submissions)
-      .where(eq(submissions.formId, formId));
+      .where(and(eq(submissions.formId, formId), inWindow));
     const totalResponders = totals?.value ?? 0;
 
     const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
@@ -395,7 +454,7 @@ export const analyticsService = {
       .where(and(eq(submissions.formId, formId), gte(submissions.createdAt, weekAgo)));
     const recentResponders = recent?.value ?? 0;
 
-    // Every analysed point for this form, with its source answer text + submission.
+    // Every analysed point for this form in the window, with its source answer text + submission.
     const pointRows = await db
       .select({
         id: points.id,
@@ -410,7 +469,7 @@ export const analyticsService = {
       .from(points)
       .innerJoin(answers, eq(points.answerId, answers.id))
       .innerJoin(submissions, eq(answers.submissionId, submissions.id))
-      .where(eq(submissions.formId, formId))
+      .where(and(eq(submissions.formId, formId), inWindow))
       .orderBy(desc(submissions.createdAt));
 
     // Overall sentiment (every point, assigned to a topic or not).
@@ -529,6 +588,11 @@ export const analyticsService = {
 
     return {
       title: `Discovered Themes of ${form.title ?? "this form"}`,
+      from: fromIso,
+      to: toIso,
+      rangeLabel,
+      /** Analysed mentions across ALL time — lets the UI tell "none yet" from "none in range". */
+      totalMentions,
       totalResponders,
       responderDeltaLabel: `+${recentResponders} this week`,
       sentiment,
@@ -551,40 +615,29 @@ export const analyticsService = {
   ): Promise<FormTrend> {
     await assertFormOwner(formId, adminId);
 
-    // Analysed mentions for this form across all time + when the newest one landed —
+    // Analysed mentions for this form across all time + when the first/last one landed —
     // used for `totalMentions` and to anchor the default window on real data.
     const [allTime] = await db
-      .select({ value: count(), latest: max(submissions.createdAt) })
+      .select({
+        value: count(),
+        earliest: min(submissions.createdAt),
+        latest: max(submissions.createdAt),
+      })
       .from(points)
       .innerJoin(answers, eq(points.answerId, answers.id))
       .innerJoin(submissions, eq(answers.submissionId, submissions.id))
       .where(and(eq(submissions.formId, formId), isNotNull(points.canonicalTopicId)));
     const totalMentions = allTime?.value ?? 0;
-    const latestMs = allTime?.latest ? parseTs(allTime.latest) : null;
+    const earliestMs = allTime?.earliest ? parseTs(allTime.earliest) : NaN;
+    const latestMs = allTime?.latest ? parseTs(allTime.latest) : NaN;
 
-    // Default window: the 90 days ending at the most recent analysed feedback (so the
-    // Trend tab opens on data, not an empty "last 90 calendar days"). Paired with a
-    // weekly bucket on the client, that's ~13 readable points. Explicit from/to win.
-    const DEFAULT_SPAN = 90 * DAY_MS;
-    const to = Number.isFinite(opts.to)
-      ? (opts.to as number)
-      : (latestMs ?? Date.now());
-    const from =
-      Number.isFinite(opts.from) && (opts.from as number) < to
-        ? (opts.from as number)
-        : to - DEFAULT_SPAN;
-    const span = Math.max(DAY_MS, to - from);
+    // Default window = the span of this form's analysed feedback (see
+    // resolveFeedbackWindow). Explicit from/to from the date filter always win.
+    const { from, to, span } = resolveFeedbackWindow(opts, earliestMs, latestMs);
     const bkt: TrendBucket = opts.bucket ?? autoBucket(span);
     const prevFrom = from - span;
 
-    const fmtDate = (t: number) =>
-      new Date(t).toLocaleDateString("en-US", {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-        timeZone: "UTC",
-      });
-    const rangeLabel = `${fmtDate(from)} – ${fmtDate(to)}`;
+    const rangeLabel = `${fmtDateUTC(from)} – ${fmtDateUTC(to)}`;
     const comparisonLabel = `vs previous ${humanSpan(span)}`;
     const fromIso = new Date(from).toISOString();
     const toIso = new Date(to).toISOString();
