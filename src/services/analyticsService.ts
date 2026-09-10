@@ -1,4 +1,4 @@
-import { and, count, countDistinct, desc, eq, gte, inArray, isNotNull, lte } from "drizzle-orm";
+import { and, count, countDistinct, desc, eq, gte, inArray, isNotNull, lte, max } from "drizzle-orm";
 
 import {
   answers,
@@ -79,6 +79,9 @@ export type TrendSentimentPoint = {
 
 export type FormTrend = {
   bucket: TrendBucket;
+  /** The resolved window (ISO) — echoes back the caller's or the auto default. */
+  from: string;
+  to: string;
   rangeLabel: string;
   comparisonLabel: string;
   /** Analysed mentions for this form across ALL time — lets the UI tell "no data yet" from "range too narrow". */
@@ -548,11 +551,28 @@ export const analyticsService = {
   ): Promise<FormTrend> {
     await assertFormOwner(formId, adminId);
 
-    const to = Number.isFinite(opts.to) ? (opts.to as number) : Date.now();
+    // Analysed mentions for this form across all time + when the newest one landed —
+    // used for `totalMentions` and to anchor the default window on real data.
+    const [allTime] = await db
+      .select({ value: count(), latest: max(submissions.createdAt) })
+      .from(points)
+      .innerJoin(answers, eq(points.answerId, answers.id))
+      .innerJoin(submissions, eq(answers.submissionId, submissions.id))
+      .where(and(eq(submissions.formId, formId), isNotNull(points.canonicalTopicId)));
+    const totalMentions = allTime?.value ?? 0;
+    const latestMs = allTime?.latest ? parseTs(allTime.latest) : null;
+
+    // Default window: the 90 days ending at the most recent analysed feedback (so the
+    // Trend tab opens on data, not an empty "last 90 calendar days"). Paired with a
+    // weekly bucket on the client, that's ~13 readable points. Explicit from/to win.
+    const DEFAULT_SPAN = 90 * DAY_MS;
+    const to = Number.isFinite(opts.to)
+      ? (opts.to as number)
+      : (latestMs ?? Date.now());
     const from =
       Number.isFinite(opts.from) && (opts.from as number) < to
         ? (opts.from as number)
-        : to - 90 * DAY_MS;
+        : to - DEFAULT_SPAN;
     const span = Math.max(DAY_MS, to - from);
     const bkt: TrendBucket = opts.bucket ?? autoBucket(span);
     const prevFrom = from - span;
@@ -566,18 +586,13 @@ export const analyticsService = {
       });
     const rangeLabel = `${fmtDate(from)} – ${fmtDate(to)}`;
     const comparisonLabel = `vs previous ${humanSpan(span)}`;
-
-    // Analysed mentions for this form across all time (regardless of the window).
-    const [allTime] = await db
-      .select({ value: count() })
-      .from(points)
-      .innerJoin(answers, eq(points.answerId, answers.id))
-      .innerJoin(submissions, eq(answers.submissionId, submissions.id))
-      .where(and(eq(submissions.formId, formId), isNotNull(points.canonicalTopicId)));
-    const totalMentions = allTime?.value ?? 0;
+    const fromIso = new Date(from).toISOString();
+    const toIso = new Date(to).toISOString();
 
     const empty: FormTrend = {
       bucket: bkt,
+      from: fromIso,
+      to: toIso,
       rangeLabel,
       comparisonLabel,
       totalMentions,
@@ -779,6 +794,8 @@ export const analyticsService = {
 
     return {
       bucket: bkt,
+      from: fromIso,
+      to: toIso,
       rangeLabel,
       comparisonLabel,
       totalMentions,
