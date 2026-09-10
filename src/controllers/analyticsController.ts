@@ -1,9 +1,19 @@
-import { analyticsService, isTrendBucket } from "../services/analyticsService";
+import { analyticsService, isTrendBucket, isTrendRank } from "../services/analyticsService";
 
 const parseMs = (value?: string): number | undefined => {
   if (!value) return undefined;
   const ms = Date.parse(value);
   return Number.isNaN(ms) ? undefined : ms;
+};
+
+/** "12,45,7" → [12, 45, 7] (positive integers only). */
+const parseIds = (value?: string): number[] | undefined => {
+  if (!value) return undefined;
+  const ids = value
+    .split(",")
+    .map((part) => Number(part.trim()))
+    .filter((n) => Number.isInteger(n) && n > 0);
+  return ids.length > 0 ? ids : undefined;
 };
 
 export const analyticsController = {
@@ -33,12 +43,20 @@ export const analyticsController = {
   formTrend(
     formId: number,
     adminId: number,
-    query: { from?: string; to?: string; bucket?: string } = {},
+    query: {
+      from?: string;
+      to?: string;
+      bucket?: string;
+      rank?: string;
+      topics?: string;
+    } = {},
   ) {
     return analyticsService.formTrend(formId, adminId, {
       from: parseMs(query.from),
       to: parseMs(query.to),
       bucket: isTrendBucket(query.bucket) ? query.bucket : undefined,
+      rank: isTrendRank(query.rank) ? query.rank : undefined,
+      topics: parseIds(query.topics),
     });
   },
 };

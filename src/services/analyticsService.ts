@@ -69,6 +69,21 @@ export type TopicMovement = {
 
 export type TrendBucket = "day" | "week" | "month" | "year";
 
+/** How the topic picker ranks its list + which topics the chart auto-selects. */
+export type TrendRank = "movers" | "mentioned" | "severe";
+
+/** One row of the Trend topic picker — every topic seen in the window, ranked. */
+export type TrendAvailableTopic = {
+  id: string;
+  label: string;
+  /** Mentions in the selected window. */
+  mentions: number;
+  /** Stock-style % change vs the previous equal window. */
+  volumeChange: number;
+  /** Severe mentions in the selected window. */
+  severe: number;
+};
+
 export type TrendVolumePoint = Record<string, number | string>;
 export type TrendSentimentPoint = {
   label: string;
@@ -79,6 +94,8 @@ export type TrendSentimentPoint = {
 
 export type FormTrend = {
   bucket: TrendBucket;
+  /** How `availableTopics` is ordered + how the chart auto-picked when `topics` wasn't given. */
+  rank: TrendRank;
   /** The resolved window (ISO) — echoes back the caller's or the auto default. */
   from: string;
   to: string;
@@ -86,7 +103,10 @@ export type FormTrend = {
   comparisonLabel: string;
   /** Analysed mentions for this form across ALL time — lets the UI tell "no data yet" from "range too narrow". */
   totalMentions: number;
+  /** The lines currently on the chart. */
   topicVolumeSeries: { id: string; label: string }[];
+  /** Every topic in the window, ranked by `rank` — powers the topic picker. */
+  availableTopics: TrendAvailableTopic[];
   volumeSeries: TrendVolumePoint[];
   sentimentSeries: TrendSentimentPoint[];
   risingTopics: TopicMovement[];
@@ -141,6 +161,16 @@ function resolveFeedbackWindow(
 const TREND_BUCKETS: readonly TrendBucket[] = ["day", "week", "month", "year"];
 export const isTrendBucket = (v: string | undefined): v is TrendBucket =>
   v !== undefined && (TREND_BUCKETS as readonly string[]).includes(v);
+
+const TREND_RANKS: readonly TrendRank[] = ["movers", "mentioned", "severe"];
+export const isTrendRank = (v: string | undefined): v is TrendRank =>
+  v !== undefined && (TREND_RANKS as readonly string[]).includes(v);
+
+/** Default line count when the chart auto-picks; hard cap when the caller picks. */
+const TREND_SERIES_DEFAULT = 5;
+const TREND_SERIES_MAX = 8;
+/** Rows sent to the picker — beyond this, topics have negligible volume anyway. */
+const TREND_AVAILABLE_LIMIT = 500;
 
 /** Pick a bucket size from the window span when the caller doesn't specify one. */
 function autoBucket(spanMs: number): TrendBucket {
@@ -604,14 +634,25 @@ export const analyticsService = {
   /**
    * Trend tab for one form, over a caller-chosen time range + bucket granularity
    * (day / week / month / year). Buckets the form's analysed feedback into a real
-   * time series — `volumeSeries` (per top topic) and `sentimentSeries` (% per
+   * time series — `volumeSeries` (per charted topic) and `sentimentSeries` (% per
    * bucket) — and compares the selected window against the immediately-preceding
    * equal window for the Rising / Declining tables (plain stock-style % change).
+   *
+   * Which topics get a line: `topics` (explicit ids from the picker, cap 8) wins;
+   * otherwise the top 5 by `rank` (movers / mentioned / severe) that clear a small
+   * volume floor. `availableTopics` returns *every* in-window topic ranked, so the
+   * picker can search/scroll the full set.
    */
   async formTrend(
     formId: number,
     adminId: number,
-    opts: { from?: number; to?: number; bucket?: TrendBucket } = {},
+    opts: {
+      from?: number;
+      to?: number;
+      bucket?: TrendBucket;
+      rank?: TrendRank;
+      topics?: number[];
+    } = {},
   ): Promise<FormTrend> {
     await assertFormOwner(formId, adminId);
 
@@ -635,6 +676,7 @@ export const analyticsService = {
     // resolveFeedbackWindow). Explicit from/to from the date filter always win.
     const { from, to, span } = resolveFeedbackWindow(opts, earliestMs, latestMs);
     const bkt: TrendBucket = opts.bucket ?? autoBucket(span);
+    const rank: TrendRank = opts.rank ?? "movers";
     const prevFrom = from - span;
 
     const rangeLabel = `${fmtDateUTC(from)} – ${fmtDateUTC(to)}`;
@@ -644,12 +686,14 @@ export const analyticsService = {
 
     const empty: FormTrend = {
       bucket: bkt,
+      rank,
       from: fromIso,
       to: toIso,
       rangeLabel,
       comparisonLabel,
       totalMentions,
       topicVolumeSeries: [],
+      availableTopics: [],
       volumeSeries: [],
       sentimentSeries: [],
       risingTopics: [],
@@ -690,8 +734,10 @@ export const analyticsService = {
 
     const current = clean.filter((r) => r.t >= from);
     const previous = clean.filter((r) => r.t < from);
-    const topicIds = [...new Set(current.map((r) => r.topicId))];
-    if (topicIds.length === 0) return empty;
+    // Every topic seen in *either* window — a topic can decline to zero in `current`
+    // yet still be worth picking ("what stopped being mentioned").
+    const topicIds = [...new Set(clean.map((r) => r.topicId))];
+    if (current.length === 0 || topicIds.length === 0) return empty;
 
     const meta = await db
       .select({ id: canonicalTopics.id, name: canonicalTopics.canonicalName })
@@ -744,11 +790,48 @@ export const analyticsService = {
       .sort((a, b) => a.volumeChange - b.volumeChange)
       .slice(0, 5);
 
-    const topicVolumeSeries = [...topicIds]
-      .sort((a, b) => (cur.get(b)?.total ?? 0) - (cur.get(a)?.total ?? 0))
-      .slice(0, 5)
-      .map((id) => ({ id: String(id), label: nameOf(id) }));
-    const seriesIds = new Set(topicVolumeSeries.map((s) => Number(s.id)));
+    // --- topic picker: rank every in-window topic ---------------------------
+    const changeById = new Map(movements.map((m) => [Number(m.id), m.volumeChange]));
+    const rankScore = (id: number): number => {
+      const c = cur.get(id) ?? zero;
+      const p = prev.get(id) ?? zero;
+      if (rank === "mentioned") return c.total;
+      if (rank === "severe") return c.severe * 100_000 + c.neg;
+      return Math.abs(c.total - p.total); // "movers"
+    };
+    const rankedIds = [...topicIds].sort(
+      (a, b) => rankScore(b) - rankScore(a) || (cur.get(b)?.total ?? 0) - (cur.get(a)?.total ?? 0),
+    );
+    const availableTopics: TrendAvailableTopic[] = rankedIds
+      .slice(0, TREND_AVAILABLE_LIMIT)
+      .map((id) => ({
+        id: String(id),
+        label: nameOf(id),
+        mentions: cur.get(id)?.total ?? 0,
+        volumeChange: changeById.get(id) ?? 0,
+        severe: cur.get(id)?.severe ?? 0,
+      }));
+
+    // Which topics get a line: explicit `topics` (cap 8) wins; else the top N by
+    // `rank` that clear a small volume floor (so a 500-topic form doesn't chart noise).
+    let selectedIds: number[];
+    if (opts.topics && opts.topics.length > 0) {
+      const allowed = new Set(topicIds);
+      selectedIds = opts.topics.filter((id) => allowed.has(id)).slice(0, TREND_SERIES_MAX);
+    } else {
+      const floor = Math.max(3, Math.round(current.length * 0.01));
+      const clears = rankedIds.filter(
+        (id) => Math.max(cur.get(id)?.total ?? 0, prev.get(id)?.total ?? 0) >= floor,
+      );
+      selectedIds = (clears.length >= TREND_SERIES_DEFAULT ? clears : rankedIds).slice(
+        0,
+        TREND_SERIES_DEFAULT,
+      );
+    }
+    if (selectedIds.length === 0) selectedIds = rankedIds.slice(0, TREND_SERIES_DEFAULT);
+
+    const topicVolumeSeries = selectedIds.map((id) => ({ id: String(id), label: nameOf(id) }));
+    const seriesIds = new Set(selectedIds);
 
     const emergingIssues = movements
       .filter((m) => (cur.get(Number(m.id))?.severe ?? 0) > 0 || m.negativeChange >= 15)
@@ -847,12 +930,14 @@ export const analyticsService = {
 
     return {
       bucket: bkt,
+      rank,
       from: fromIso,
       to: toIso,
       rangeLabel,
       comparisonLabel,
       totalMentions,
       topicVolumeSeries,
+      availableTopics,
       volumeSeries,
       sentimentSeries,
       risingTopics,

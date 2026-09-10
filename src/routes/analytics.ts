@@ -67,6 +67,8 @@ export const analyticsRoutes = new Elysia({ prefix: "/analytics" })
         from: typeof query.from === "string" ? query.from : undefined,
         to: typeof query.to === "string" ? query.to : undefined,
         bucket: typeof query.bucket === "string" ? query.bucket : undefined,
+        rank: typeof query.rank === "string" ? query.rank : undefined,
+        topics: typeof query.topics === "string" ? query.topics : undefined,
       });
       return successResponse("Form trend analytics loaded successfully", data);
     },
@@ -76,8 +78,10 @@ export const analyticsRoutes = new Elysia({ prefix: "/analytics" })
         security,
         summary: "Trend over a time window + bucket (Trend tab)",
         description:
-          "Query: from / to (ISO dates) and bucket (day | week | month | year). " +
-          "Returns a real time series plus Rising/Declining vs the previous equal window.",
+          "Query: from / to (ISO dates), bucket (day | week | month | year), " +
+          "rank (movers | mentioned | severe — orders availableTopics + auto-picks lines), " +
+          "topics (comma-separated topic ids to chart, max 8). " +
+          "Returns a real time series plus availableTopics for the picker.",
       },
     },
   );
