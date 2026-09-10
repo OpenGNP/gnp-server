@@ -12,4 +12,8 @@ export const analyticsController = {
   formResponses(formId: number, adminId: number) {
     return analyticsService.formResponses(formId, adminId);
   },
+
+  formThemes(formId: number, adminId: number) {
+    return analyticsService.formThemes(formId, adminId);
+  },
 };

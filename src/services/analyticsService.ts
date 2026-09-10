@@ -1,4 +1,4 @@
-import { and, count, countDistinct, desc, eq, isNotNull } from "drizzle-orm";
+import { and, count, countDistinct, desc, eq, gte, inArray, isNotNull } from "drizzle-orm";
 
 import {
   answers,
@@ -31,6 +31,60 @@ export type FieldBreakdown =
       options: { id: string; label: string; value: number }[];
     }
   | { kind: "text"; id: string; title: string; responses: string[] };
+
+type Sentiment = "negative" | "neutral" | "positive";
+
+export type ThemeKeyword = { text: string; weight: 1 | 2 | 3 };
+
+export type ThemeFeedbackPoint = {
+  id: string;
+  sentiment: Sentiment;
+  quote: string;
+  originalFeedback: string;
+  submittedAt: string;
+  department: string;
+  year: string;
+  gender: string;
+};
+
+export type ThemeTopic = {
+  id: string;
+  label: string;
+  negative: number;
+  neutral: number;
+  positive: number;
+  percentOfTotal: number;
+  isHighIntensity: boolean;
+  aiSummary: string;
+  keywords: ThemeKeyword[];
+  feedbackSegment: ThemeFeedbackPoint[];
+};
+
+const SENTIMENTS: readonly Sentiment[] = ["negative", "neutral", "positive"];
+const isSentiment = (value: string | null): value is Sentiment =>
+  value !== null && (SENTIMENTS as readonly string[]).includes(value);
+
+/** "curriculum, outdated courses, projects" → weighted keyword chips (first ones heavier). */
+function parseKeywords(raw: string | null): ThemeKeyword[] {
+  const words = (raw ?? "")
+    .split(",")
+    .map((word) => word.trim())
+    .filter(Boolean)
+    .slice(0, 8);
+  return words.map((text, index) => ({ text, weight: index < 2 ? 3 : index < 5 ? 2 : 1 }));
+}
+
+async function assertFormOwner(formId: number, adminId: number) {
+  const [form] = await db
+    .select({ id: forms.id, adminId: forms.adminId, title: forms.formTitle })
+    .from(forms)
+    .where(eq(forms.id, formId))
+    .limit(1);
+
+  if (!form) throw notFound("Form not found");
+  if (form.adminId !== adminId) throw forbidden("You do not have access to this form");
+  return form;
+}
 
 export const analyticsService = {
   async summary(adminId: number) {
@@ -111,14 +165,7 @@ export const analyticsService = {
    * checkbox → bar (`multi-choice`), text/textarea → response list (`text`).
    */
   async formResponses(formId: number, adminId: number) {
-    const [form] = await db
-      .select({ id: forms.id, adminId: forms.adminId })
-      .from(forms)
-      .where(eq(forms.id, formId))
-      .limit(1);
-
-    if (!form) throw notFound("Form not found");
-    if (form.adminId !== adminId) throw forbidden("You do not have access to this form");
+    await assertFormOwner(formId, adminId);
 
     const fields = await db
       .select({
@@ -222,5 +269,159 @@ export const analyticsService = {
     }
 
     return { totalResponses, demographic, feedback };
+  },
+
+  /**
+   * Theme analysis for one form's Dashboard "Themes" tab: overall sentiment, the
+   * canonical topics its analysed feedback maps to (per-topic sentiment split,
+   * keywords, and a demographic-tagged sample of feedback points), and the
+   * high-intensity subset. Trend line in the detail panel is synthetic client-side.
+   */
+  async formThemes(formId: number, adminId: number) {
+    const form = await assertFormOwner(formId, adminId);
+
+    const [totals] = await db
+      .select({ value: count() })
+      .from(submissions)
+      .where(eq(submissions.formId, formId));
+    const totalResponders = totals?.value ?? 0;
+
+    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const [recent] = await db
+      .select({ value: count() })
+      .from(submissions)
+      .where(and(eq(submissions.formId, formId), gte(submissions.createdAt, weekAgo)));
+    const recentResponders = recent?.value ?? 0;
+
+    // Every analysed point for this form, with its source answer text + submission.
+    const pointRows = await db
+      .select({
+        id: points.id,
+        topicId: points.canonicalTopicId,
+        sentiment: points.sentimentLabel,
+        severe: points.isSevere,
+        pointText: points.pointText,
+        originalFeedback: answers.answerText,
+        submissionId: submissions.id,
+        submittedAt: submissions.createdAt,
+      })
+      .from(points)
+      .innerJoin(answers, eq(points.answerId, answers.id))
+      .innerJoin(submissions, eq(answers.submissionId, submissions.id))
+      .where(eq(submissions.formId, formId))
+      .orderBy(desc(submissions.createdAt));
+
+    // Overall sentiment (every point, assigned to a topic or not).
+    const overall: Record<Sentiment, number> = { negative: 0, neutral: 0, positive: 0 };
+    for (const row of pointRows) {
+      if (isSentiment(row.sentiment)) overall[row.sentiment] += 1;
+    }
+    const overallTotal = overall.negative + overall.neutral + overall.positive || 1;
+    const pct = (value: number) => Math.round((value / overallTotal) * 100);
+    const sentiment = {
+      score:
+        Math.round(
+          ((overall.positive * 5 + overall.neutral * 3 + overall.negative) / overallTotal) * 10,
+        ) / 10,
+      outOf: 5,
+      negative: pct(overall.negative),
+      neutral: pct(overall.neutral),
+      positive: pct(overall.positive),
+    };
+
+    // Demographic context per submission — radio demographic answers, matched by label.
+    const demoRows = await db
+      .select({
+        submissionId: answers.submissionId,
+        label: formFields.fieldLabel,
+        option: fieldOptions.optionLabel,
+      })
+      .from(answers)
+      .innerJoin(formFields, eq(answers.fieldId, formFields.id))
+      .innerJoin(fieldOptions, eq(answers.answerOptionId, fieldOptions.id))
+      .where(and(eq(formFields.formId, formId), eq(formFields.section, "demographic")));
+
+    const demoBySubmission = new Map<number, { department: string; year: string; gender: string }>();
+    for (const row of demoRows) {
+      const slot = demoBySubmission.get(row.submissionId) ?? { department: "", year: "", gender: "" };
+      const label = (row.label ?? "").toLowerCase();
+      const value = row.option ?? "";
+      if (/gender|sex/.test(label)) slot.gender = value;
+      else if (/year|level/.test(label)) slot.year = value;
+      else if (/program|department|major|faculty|course/.test(label)) slot.department = value;
+      demoBySubmission.set(row.submissionId, slot);
+    }
+
+    const assigned = pointRows.filter((row) => row.topicId !== null && isSentiment(row.sentiment));
+    const assignedTotal = assigned.length || 1;
+    const topicIds = [...new Set(assigned.map((row) => row.topicId as number))];
+
+    const topicMeta =
+      topicIds.length > 0
+        ? await db
+            .select({
+              id: canonicalTopics.id,
+              name: canonicalTopics.canonicalName,
+              summary: canonicalTopics.canonicalSummary,
+              keywords: canonicalTopics.representativeKeywords,
+            })
+            .from(canonicalTopics)
+            .where(inArray(canonicalTopics.id, topicIds))
+        : [];
+    const metaById = new Map(topicMeta.map((meta) => [meta.id, meta]));
+
+    const FEEDBACK_SAMPLE = 15;
+    const topics: ThemeTopic[] = topicIds.map((topicId) => {
+      const meta = metaById.get(topicId);
+      const rows = assigned.filter((row) => row.topicId === topicId);
+      const counts: Record<Sentiment, number> = { negative: 0, neutral: 0, positive: 0 };
+      let severe = 0;
+      for (const row of rows) {
+        counts[row.sentiment as Sentiment] += 1;
+        if (row.severe) severe += 1;
+      }
+      const topicTotal = rows.length || 1;
+
+      const feedbackSegment: ThemeFeedbackPoint[] = rows.slice(0, FEEDBACK_SAMPLE).map((row) => {
+        const demo = demoBySubmission.get(row.submissionId);
+        return {
+          id: String(row.id),
+          sentiment: row.sentiment as Sentiment,
+          quote: row.pointText ?? "",
+          originalFeedback: row.originalFeedback ?? row.pointText ?? "",
+          submittedAt: row.submittedAt ?? new Date().toISOString(),
+          department: demo?.department || "Unspecified",
+          year: demo?.year || "Unspecified",
+          gender: demo?.gender || "Unspecified",
+        };
+      });
+
+      return {
+        id: String(topicId),
+        label: meta?.name ?? "Untitled topic",
+        negative: counts.negative,
+        neutral: counts.neutral,
+        positive: counts.positive,
+        percentOfTotal: Math.round((rows.length / assignedTotal) * 1000) / 10,
+        isHighIntensity: severe > 0 || (counts.negative / topicTotal >= 0.5 && rows.length >= 3),
+        aiSummary: meta?.summary ?? "",
+        keywords: parseKeywords(meta?.keywords ?? null),
+        feedbackSegment,
+      };
+    });
+
+    topics.sort(
+      (a, b) =>
+        b.negative + b.neutral + b.positive - (a.negative + a.neutral + a.positive),
+    );
+
+    return {
+      title: `Discovered Themes of ${form.title ?? "this form"}`,
+      totalResponders,
+      responderDeltaLabel: `+${recentResponders} this week`,
+      sentiment,
+      highIntenseTopics: topics.filter((topic) => topic.isHighIntensity),
+      aiDiscoveredTopics: topics,
+    };
   },
 };
