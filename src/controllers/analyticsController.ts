@@ -16,4 +16,8 @@ export const analyticsController = {
   formThemes(formId: number, adminId: number) {
     return analyticsService.formThemes(formId, adminId);
   },
+
+  formTrend(formId: number, adminId: number) {
+    return analyticsService.formTrend(formId, adminId);
+  },
 };

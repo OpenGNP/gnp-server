@@ -42,9 +42,8 @@ export type ThemeFeedbackPoint = {
   quote: string;
   originalFeedback: string;
   submittedAt: string;
-  department: string;
-  year: string;
-  gender: string;
+  /** The respondent's answers to the form's demographic (single-choice) questions, in form order. */
+  demographics: { label: string; value: string }[];
 };
 
 export type ThemeTopic = {
@@ -59,6 +58,36 @@ export type ThemeTopic = {
   keywords: ThemeKeyword[];
   feedbackSegment: ThemeFeedbackPoint[];
 };
+
+export type TopicMovement = {
+  id: string;
+  label: string;
+  volumeChange: number;
+  positiveChange: number;
+  negativeChange: number;
+};
+
+export type FormTrend = {
+  rangeLabel: string;
+  comparisonLabel: string;
+  topicVolumeSeries: { id: string; label: string }[];
+  risingTopics: TopicMovement[];
+  decliningTopics: TopicMovement[];
+  emergingIssues: { id: string; title: string; description: string; riskLabel: string }[];
+  timelineEvents: {
+    id: string;
+    date: string;
+    description: string;
+    change: number;
+    metricLabel: string;
+  }[];
+};
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Zone-less DB timestamp → epoch ms, read as UTC (columns are `timestamp` without tz). */
+const parseTs = (value: string): number =>
+  Date.parse(/Z$|[+-]\d\d(:?\d\d)?$/.test(value) ? value : `${value.replace(" ", "T")}Z`);
 
 const SENTIMENTS: readonly Sentiment[] = ["negative", "neutral", "positive"];
 const isSentiment = (value: string | null): value is Sentiment =>
@@ -329,27 +358,40 @@ export const analyticsService = {
       positive: pct(overall.positive),
     };
 
-    // Demographic context per submission — radio demographic answers, matched by label.
+    // The respondent's demographic answers per submission — whatever single-choice
+    // questions this form's demographic section has (Year, Department, Age, …), kept
+    // generic and in form order rather than mapped to fixed slots.
     const demoRows = await db
       .select({
         submissionId: answers.submissionId,
+        fieldId: formFields.id,
+        order: formFields.fieldOrder,
         label: formFields.fieldLabel,
         option: fieldOptions.optionLabel,
       })
       .from(answers)
       .innerJoin(formFields, eq(answers.fieldId, formFields.id))
       .innerJoin(fieldOptions, eq(answers.answerOptionId, fieldOptions.id))
-      .where(and(eq(formFields.formId, formId), eq(formFields.section, "demographic")));
+      .where(
+        and(
+          eq(formFields.formId, formId),
+          eq(formFields.section, "demographic"),
+          eq(formFields.fieldType, "radio"),
+        ),
+      );
 
-    const demoBySubmission = new Map<number, { department: string; year: string; gender: string }>();
+    type DemoAnswer = { fieldId: number; order: number; label: string; value: string };
+    const demoBySubmission = new Map<number, DemoAnswer[]>();
     for (const row of demoRows) {
-      const slot = demoBySubmission.get(row.submissionId) ?? { department: "", year: "", gender: "" };
-      const label = (row.label ?? "").toLowerCase();
-      const value = row.option ?? "";
-      if (/gender|sex/.test(label)) slot.gender = value;
-      else if (/year|level/.test(label)) slot.year = value;
-      else if (/program|department|major|faculty|course/.test(label)) slot.department = value;
-      demoBySubmission.set(row.submissionId, slot);
+      const list = demoBySubmission.get(row.submissionId) ?? [];
+      if (list.some((entry) => entry.fieldId === row.fieldId)) continue; // one answer per radio field
+      list.push({
+        fieldId: row.fieldId,
+        order: row.order ?? 0,
+        label: row.label ?? "Question",
+        value: row.option ?? "",
+      });
+      demoBySubmission.set(row.submissionId, list);
     }
 
     const assigned = pointRows.filter((row) => row.topicId !== null && isSentiment(row.sentiment));
@@ -382,19 +424,16 @@ export const analyticsService = {
       }
       const topicTotal = rows.length || 1;
 
-      const feedbackSegment: ThemeFeedbackPoint[] = rows.slice(0, FEEDBACK_SAMPLE).map((row) => {
-        const demo = demoBySubmission.get(row.submissionId);
-        return {
-          id: String(row.id),
-          sentiment: row.sentiment as Sentiment,
-          quote: row.pointText ?? "",
-          originalFeedback: row.originalFeedback ?? row.pointText ?? "",
-          submittedAt: row.submittedAt ?? new Date().toISOString(),
-          department: demo?.department || "Unspecified",
-          year: demo?.year || "Unspecified",
-          gender: demo?.gender || "Unspecified",
-        };
-      });
+      const feedbackSegment: ThemeFeedbackPoint[] = rows.slice(0, FEEDBACK_SAMPLE).map((row) => ({
+        id: String(row.id),
+        sentiment: row.sentiment as Sentiment,
+        quote: row.pointText ?? "",
+        originalFeedback: row.originalFeedback ?? row.pointText ?? "",
+        submittedAt: row.submittedAt ?? new Date().toISOString(),
+        demographics: [...(demoBySubmission.get(row.submissionId) ?? [])]
+          .sort((a, b) => a.order - b.order)
+          .map((entry) => ({ label: entry.label, value: entry.value || "Unspecified" })),
+      }));
 
       return {
         id: String(topicId),
@@ -422,6 +461,189 @@ export const analyticsService = {
       sentiment,
       highIntenseTopics: topics.filter((topic) => topic.isHighIntensity),
       aiDiscoveredTopics: topics,
+    };
+  },
+
+  /**
+   * Trend tab for one form. Splits the form's feedback window in half and compares
+   * topic volume + sentiment share between the two halves. The two line charts in
+   * `TrendView` stay client-synthetic (a sparse real daily series would look worse);
+   * this powers the Rising/Declining tables, Emerging Issues, Timeline, and the chart
+   * series labels.
+   */
+  async formTrend(formId: number, adminId: number): Promise<FormTrend> {
+    await assertFormOwner(formId, adminId);
+
+    const rows = await db
+      .select({
+        topicId: points.canonicalTopicId,
+        sentiment: points.sentimentLabel,
+        severe: points.isSevere,
+        submittedAt: submissions.createdAt,
+      })
+      .from(points)
+      .innerJoin(answers, eq(points.answerId, answers.id))
+      .innerJoin(submissions, eq(answers.submissionId, submissions.id))
+      .where(
+        and(
+          eq(submissions.formId, formId),
+          isNotNull(points.canonicalTopicId),
+          isNotNull(submissions.createdAt),
+        ),
+      );
+
+    const empty: FormTrend = {
+      rangeLabel: "No data yet",
+      comparisonLabel: "",
+      topicVolumeSeries: [],
+      risingTopics: [],
+      decliningTopics: [],
+      emergingIssues: [],
+      timelineEvents: [],
+    };
+    if (rows.length === 0) return empty;
+
+    const times = rows.map((row) => parseTs(row.submittedAt as string)).filter((n) => !Number.isNaN(n));
+    if (times.length === 0) return empty;
+    const minT = Math.min(...times);
+    const maxT = Math.max(...times);
+    const midT = minT + (maxT - minT) / 2;
+    const windowDays = Math.max(1, Math.round((maxT - minT) / DAY_MS));
+
+    const topicIds = [...new Set(rows.map((row) => row.topicId as number))];
+    const meta =
+      topicIds.length > 0
+        ? await db
+            .select({ id: canonicalTopics.id, name: canonicalTopics.canonicalName })
+            .from(canonicalTopics)
+            .where(inArray(canonicalTopics.id, topicIds))
+        : [];
+    const nameById = new Map(meta.map((row) => [row.id, row.name ?? "Untitled topic"]));
+
+    type Bucket = { total: number; neg: number; pos: number; severe: number };
+    const bucket = (): Bucket => ({ total: 0, neg: 0, pos: 0, severe: 0 });
+    const first = new Map<number, Bucket>();
+    const second = new Map<number, Bucket>();
+    const overall = new Map<number, Bucket>();
+    const add = (map: Map<number, Bucket>, topicId: number, row: (typeof rows)[number]) => {
+      const b = map.get(topicId) ?? bucket();
+      b.total += 1;
+      if (row.sentiment === "negative") b.neg += 1;
+      if (row.sentiment === "positive") b.pos += 1;
+      if (row.severe) b.severe += 1;
+      map.set(topicId, b);
+    };
+    for (const row of rows) {
+      const t = parseTs(row.submittedAt as string);
+      if (Number.isNaN(t)) continue;
+      const topicId = row.topicId as number;
+      add(t < midT ? first : second, topicId, row);
+      add(overall, topicId, row);
+    }
+
+    const share = (part: number, whole: number) => (whole > 0 ? (part / whole) * 100 : 0);
+
+    const movements: TopicMovement[] = topicIds.map((id) => {
+      const b1 = first.get(id) ?? bucket();
+      const b2 = second.get(id) ?? bucket();
+      const volumeChange =
+        b1.total > 0
+          ? Math.round(((b2.total - b1.total) / b1.total) * 100)
+          : b2.total > 0
+            ? 100
+            : 0;
+      return {
+        id: String(id),
+        label: nameById.get(id) ?? "Untitled topic",
+        volumeChange,
+        positiveChange: Math.round(share(b2.pos, b2.total) - share(b1.pos, b1.total)),
+        negativeChange: Math.round(share(b2.neg, b2.total) - share(b1.neg, b1.total)),
+      };
+    });
+
+    const totalOf = (id: string) => overall.get(Number(id))?.total ?? 0;
+    const severeOf = (id: string) => overall.get(Number(id))?.severe ?? 0;
+
+    const topicVolumeSeries = [...movements]
+      .sort((a, b) => totalOf(b.id) - totalOf(a.id))
+      .slice(0, 5)
+      .map(({ id, label }) => ({ id, label }));
+
+    const risingTopics = movements
+      .filter((m) => m.volumeChange > 0)
+      .sort((a, b) => b.volumeChange - a.volumeChange)
+      .slice(0, 5);
+    const decliningTopics = movements
+      .filter((m) => m.volumeChange < 0)
+      .sort((a, b) => a.volumeChange - b.volumeChange)
+      .slice(0, 5);
+
+    const emergingIssues = movements
+      .filter((m) => severeOf(m.id) > 0 || m.negativeChange >= 15)
+      .sort((a, b) => severeOf(b.id) - severeOf(a.id) || b.negativeChange - a.negativeChange)
+      .slice(0, 3)
+      .map((m) => {
+        const severe = severeOf(m.id);
+        return {
+          id: m.id,
+          title: m.label,
+          description:
+            severe > 0
+              ? `${severe} severe report${severe === 1 ? "" : "s"} flagged in this topic`
+              : `Negative mentions up ${m.negativeChange}% vs the earlier period`,
+          riskLabel: severe > 0 ? "Critical" : "High",
+        };
+      });
+
+    // Weekly volume buckets → biggest week-over-week jumps for the timeline.
+    const WEEK_MS = 7 * DAY_MS;
+    const weekCount = Math.max(1, Math.ceil((maxT - minT) / WEEK_MS));
+    const weekTotals = new Array<number>(weekCount).fill(0);
+    const weekTopic = new Map<number, Map<number, number>>();
+    for (const row of rows) {
+      const t = parseTs(row.submittedAt as string);
+      if (Number.isNaN(t)) continue;
+      const idx = Math.min(weekCount - 1, Math.floor((t - minT) / WEEK_MS));
+      weekTotals[idx] = (weekTotals[idx] ?? 0) + 1;
+      const wk = weekTopic.get(idx) ?? new Map<number, number>();
+      wk.set(row.topicId as number, (wk.get(row.topicId as number) ?? 0) + 1);
+      weekTopic.set(idx, wk);
+    }
+
+    const timelineEvents = weekTotals
+      .map((total, idx) => {
+        const prev = idx > 0 ? weekTotals[idx - 1]! : 0;
+        const change =
+          prev > 0 ? Math.round(((total - prev) / prev) * 100) : idx > 0 && total > 0 ? 100 : 0;
+        let topId = 0;
+        let topCount = -1;
+        for (const [tid, c] of weekTopic.get(idx) ?? []) {
+          if (c > topCount) {
+            topCount = c;
+            topId = tid;
+          }
+        }
+        return {
+          id: `week-${idx}`,
+          date: new Date(minT + (idx + 1) * WEEK_MS).toISOString(),
+          description: `${nameById.get(topId) ?? "Feedback"} was the most-discussed topic`,
+          change,
+          metricLabel: "weekly mentions",
+        };
+      })
+      .filter((event) => event.change > 0)
+      .sort((a, b) => b.change - a.change)
+      .slice(0, 4);
+
+    const fmt = (t: number) => new Date(t).toISOString().slice(0, 10);
+    return {
+      rangeLabel: `Last ${windowDays} days`,
+      comparisonLabel: `vs ${fmt(minT)} – ${fmt(midT)}`,
+      topicVolumeSeries,
+      risingTopics,
+      decliningTopics,
+      emergingIssues,
+      timelineEvents,
     };
   },
 };

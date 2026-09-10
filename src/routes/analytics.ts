@@ -47,4 +47,14 @@ export const analyticsRoutes = new Elysia({ prefix: "/analytics" })
       return successResponse("Form theme analytics loaded successfully", data);
     },
     { detail: { tags, security, summary: "Topic / sentiment analysis for one form (Themes tab)" } },
+  )
+  .get(
+    "/forms/:id/trend",
+    async ({ params, currentUser }) => {
+      assertCurrentUser(currentUser);
+      const id = parseIntParam(params.id, "form id");
+      const data = await analyticsController.formTrend(id, currentUser.id);
+      return successResponse("Form trend analytics loaded successfully", data);
+    },
+    { detail: { tags, security, summary: "Topic movement / emerging issues over time (Trend tab)" } },
   );

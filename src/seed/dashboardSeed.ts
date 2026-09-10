@@ -85,6 +85,14 @@ const GENDERS: Weighted = [
   ["Female", 4],
   ["Prefer not to say", 1],
 ];
+// An extra demographic question beyond the usual three — the dashboard reads whatever
+// the form has, so this just shows up as its own filter group + chip.
+const AGE_GROUPS: Weighted = [
+  ["18–20", 5],
+  ["21–23", 5],
+  ["24–26", 2],
+  ["27 or older", 1],
+];
 const SATISFACTION: Weighted = [
   ["Very dissatisfied", 1],
   ["Dissatisfied", 2],
@@ -482,24 +490,31 @@ async function main() {
     3,
     GENDERS.map(([label]) => label),
   );
+  const ageField = await addChoiceField(
+    "Age group",
+    "demographic",
+    "radio",
+    4,
+    AGE_GROUPS.map(([label]) => label),
+  );
   const satisfactionField = await addChoiceField(
     "Overall, how satisfied are you with SIT this semester?",
     "feedback",
     "radio",
-    4,
+    5,
     SATISFACTION.map(([label]) => label),
   );
   const facilitiesUsedField = await addChoiceField(
     "Which campus facilities do you use regularly?",
     "feedback",
     "checkbox",
-    5,
+    6,
     FACILITIES,
   );
-  const curriculumField = await addTextField("What do you think about the current curriculum?", 6);
+  const curriculumField = await addTextField("What do you think about the current curriculum?", 7);
   const facilityField = await addTextField(
     "What would you like to share about campus facilities?",
-    7,
+    8,
   );
 
   // Submissions -------------------------------------------------------
@@ -538,6 +553,12 @@ async function main() {
         submissionId: submission.id,
         fieldId: genderField.id,
         answerOptionId: genderField.optionIds.get(weightedPick(GENDERS))!,
+        createdAt: submittedAt,
+      },
+      {
+        submissionId: submission.id,
+        fieldId: ageField.id,
+        answerOptionId: ageField.optionIds.get(weightedPick(AGE_GROUPS))!,
         createdAt: submittedAt,
       },
       {
