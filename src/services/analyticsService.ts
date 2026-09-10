@@ -70,7 +70,7 @@ export type TopicMovement = {
 export type TrendBucket = "day" | "week" | "month" | "year";
 
 /** How the topic picker ranks its list + which topics the chart auto-selects. */
-export type TrendRank = "movers" | "mentioned" | "severe";
+export type TrendRank = "mentioned" | "severe";
 
 /** One row of the Trend topic picker — every topic seen in the window, ranked. */
 export type TrendAvailableTopic = {
@@ -78,8 +78,6 @@ export type TrendAvailableTopic = {
   label: string;
   /** Mentions in the selected window. */
   mentions: number;
-  /** Stock-style % change vs the previous equal window. */
-  volumeChange: number;
   /** Severe mentions in the selected window. */
   severe: number;
 };
@@ -162,7 +160,7 @@ const TREND_BUCKETS: readonly TrendBucket[] = ["day", "week", "month", "year"];
 export const isTrendBucket = (v: string | undefined): v is TrendBucket =>
   v !== undefined && (TREND_BUCKETS as readonly string[]).includes(v);
 
-const TREND_RANKS: readonly TrendRank[] = ["movers", "mentioned", "severe"];
+const TREND_RANKS: readonly TrendRank[] = ["mentioned", "severe"];
 export const isTrendRank = (v: string | undefined): v is TrendRank =>
   v !== undefined && (TREND_RANKS as readonly string[]).includes(v);
 
@@ -639,9 +637,9 @@ export const analyticsService = {
    * equal window for the Rising / Declining tables (plain stock-style % change).
    *
    * Which topics get a line: `topics` (explicit ids from the picker, cap 8) wins;
-   * otherwise the top 5 by `rank` (movers / mentioned / severe) that clear a small
-   * volume floor. `availableTopics` returns *every* in-window topic ranked, so the
-   * picker can search/scroll the full set.
+   * otherwise the top 5 by `rank` (mentioned / severe) that clear a small volume
+   * floor. `availableTopics` returns *every* in-window topic ranked, so the picker
+   * can search/scroll the full set.
    */
   async formTrend(
     formId: number,
@@ -676,7 +674,7 @@ export const analyticsService = {
     // resolveFeedbackWindow). Explicit from/to from the date filter always win.
     const { from, to, span } = resolveFeedbackWindow(opts, earliestMs, latestMs);
     const bkt: TrendBucket = opts.bucket ?? autoBucket(span);
-    const rank: TrendRank = opts.rank ?? "movers";
+    const rank: TrendRank = opts.rank ?? "mentioned";
     const prevFrom = from - span;
 
     const rangeLabel = `${fmtDateUTC(from)} – ${fmtDateUTC(to)}`;
@@ -791,13 +789,9 @@ export const analyticsService = {
       .slice(0, 5);
 
     // --- topic picker: rank every in-window topic ---------------------------
-    const changeById = new Map(movements.map((m) => [Number(m.id), m.volumeChange]));
     const rankScore = (id: number): number => {
       const c = cur.get(id) ?? zero;
-      const p = prev.get(id) ?? zero;
-      if (rank === "mentioned") return c.total;
-      if (rank === "severe") return c.severe * 100_000 + c.neg;
-      return Math.abs(c.total - p.total); // "movers"
+      return rank === "severe" ? c.severe * 100_000 + c.neg : c.total; // else "mentioned"
     };
     const rankedIds = [...topicIds].sort(
       (a, b) => rankScore(b) - rankScore(a) || (cur.get(b)?.total ?? 0) - (cur.get(a)?.total ?? 0),
@@ -808,7 +802,6 @@ export const analyticsService = {
         id: String(id),
         label: nameOf(id),
         mentions: cur.get(id)?.total ?? 0,
-        volumeChange: changeById.get(id) ?? 0,
         severe: cur.get(id)?.severe ?? 0,
       }));
 
