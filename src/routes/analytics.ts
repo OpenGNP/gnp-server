@@ -50,11 +50,24 @@ export const analyticsRoutes = new Elysia({ prefix: "/analytics" })
   )
   .get(
     "/forms/:id/trend",
-    async ({ params, currentUser }) => {
+    async ({ params, query, currentUser }) => {
       assertCurrentUser(currentUser);
       const id = parseIntParam(params.id, "form id");
-      const data = await analyticsController.formTrend(id, currentUser.id);
+      const data = await analyticsController.formTrend(id, currentUser.id, {
+        from: typeof query.from === "string" ? query.from : undefined,
+        to: typeof query.to === "string" ? query.to : undefined,
+        bucket: typeof query.bucket === "string" ? query.bucket : undefined,
+      });
       return successResponse("Form trend analytics loaded successfully", data);
     },
-    { detail: { tags, security, summary: "Topic movement / emerging issues over time (Trend tab)" } },
+    {
+      detail: {
+        tags,
+        security,
+        summary: "Trend over a time window + bucket (Trend tab)",
+        description:
+          "Query: from / to (ISO dates) and bucket (day | week | month | year). " +
+          "Returns a real time series plus Rising/Declining vs the previous equal window.",
+      },
+    },
   );
