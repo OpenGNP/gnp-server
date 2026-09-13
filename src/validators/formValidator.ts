@@ -38,10 +38,15 @@ const formFieldSchema = z.object({
   options: z.array(fieldOptionSchema).optional(),
 });
 
+// A data: URL cover image is stored inline (no file-hosting infra), so the cap here
+// bounds the base64 payload size rather than a URL length — ~3.5MB of source image.
+const coverImageUrlSchema = z.string().trim().max(5_000_000);
+
 export const createFormSchema = z.object({
   folderId: z.number().int().positive().optional(),
   formTitle: z.string().trim().min(1).max(255),
   formDescription: z.string().trim().max(2000).optional(),
+  coverImageUrl: coverImageUrlSchema.optional(),
   status: formStatusEnum.default("draft"),
   accessType: formAccessTypeEnum.default("organization"),
   acceptingResponses: z.boolean().default(false),
@@ -66,6 +71,7 @@ export const updateFormSchema = z.object({
   folderId: z.number().int().positive().nullable().optional(),
   formTitle: z.string().trim().min(1).max(255).optional(),
   formDescription: z.string().trim().max(2000).optional(),
+  coverImageUrl: coverImageUrlSchema.nullable().optional(),
   status: formStatusEnum.optional(),
   accessType: formAccessTypeEnum.optional(),
   acceptingResponses: z.boolean().optional(),

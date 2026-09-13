@@ -21,6 +21,10 @@ export const formController = {
     return formService.getPublicByToken(token, viewer);
   },
 
+  getPublicBySlug(slug: string, viewer: CurrentUser | null) {
+    return formService.getPublicBySlug(slug, viewer);
+  },
+
   create(admin: CurrentUser, input: CreateFormInput) {
     return formService.create(admin, input);
   },
