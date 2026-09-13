@@ -17,23 +17,42 @@ import {
 const tags = ["Forms"];
 const security = [{ bearerAuth: [] }];
 
-const publicFormRoutes = new Elysia().use(optionalAuth).get(
-  "/public/:token",
-  async ({ params, currentUser }) => {
-    const data = await formController.getPublicByToken(params.token, currentUser);
-    return successResponse("Form loaded successfully", data);
-  },
-  {
-    detail: {
-      tags,
-      summary: "Get the respondent-facing view of a form by its public token",
-      description:
-        "Looked up by the form's unguessable public token (not its id), so a shared link can't be " +
-        "enumerated. Enforces status and accessType; an optional Bearer token checks " +
-        "organization/specific-people access but isn't required for public forms.",
+const publicFormRoutes = new Elysia()
+  .use(optionalAuth)
+  .get(
+    "/public/:token",
+    async ({ params, currentUser }) => {
+      const data = await formController.getPublicByToken(params.token, currentUser);
+      return successResponse("Form loaded successfully", data);
     },
-  },
-);
+    {
+      detail: {
+        tags,
+        summary: "Get the respondent-facing view of a form by its public token",
+        description:
+          "Looked up by the form's unguessable public token (not its id), so a shared link can't be " +
+          "enumerated. Enforces status and accessType; an optional Bearer token checks " +
+          "organization/specific-people access but isn't required for public forms.",
+      },
+    },
+  )
+  .get(
+    "/slug/:slug",
+    async ({ params, currentUser }) => {
+      const data = await formController.getPublicBySlug(params.slug, currentUser);
+      return successResponse("Form loaded successfully", data);
+    },
+    {
+      detail: {
+        tags,
+        summary: "Get the respondent-facing view of a form by its human-readable slug",
+        description:
+          "Used for shareable `/form/{slug}` links. Enforces status, accessType, and the form's " +
+          "start/end date window, in addition to the same optional-Bearer access checks as the " +
+          "public-token endpoint.",
+      },
+    },
+  );
 
 const adminFormRoutes = new Elysia()
   .use(requireAuth)

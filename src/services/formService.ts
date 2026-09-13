@@ -134,6 +134,16 @@ async function loadFormForViewer(where: SQL) {
   return form;
 }
 
+function assertWithinResponseWindow(form: { startDate: string | null; endDate: string | null }) {
+  const now = Date.now();
+  if (form.startDate && now < parseStoredTimestamp(form.startDate)) {
+    throw forbidden("This form is not yet accepting responses");
+  }
+  if (form.endDate && now > parseStoredTimestamp(form.endDate)) {
+    throw forbidden("This form is no longer accepting responses");
+  }
+}
+
 function assertAccessible(
   form: { accessType: string | null; organizationId: number | null; formAllowedUsers: { userId: number }[] },
   viewer: CurrentUser | null,
@@ -234,9 +244,38 @@ export const formService = {
       id: form.id,
       formTitle: form.formTitle,
       formDescription: form.formDescription,
+      coverImageUrl: form.coverImageUrl,
       accessType: form.accessType,
       acceptingResponses: form.acceptingResponses,
       recordName: form.recordName,
+      oneResponsePerPerson: form.oneResponsePerPerson,
+      startDate: form.startDate,
+      endDate: form.endDate,
+      fields: form.formFields,
+    };
+  },
+
+  /**
+   * Respondent-facing view, looked up by the form's human-readable `slug` so it can be
+   * shared as `/form/{slug}`. Same status/access rules as `getPublicByToken`, plus the
+   * start/end date window — a slug link only resolves while the form is actually open.
+   */
+  async getPublicBySlug(slug: string, viewer: CurrentUser | null) {
+    const form = await loadFormForViewer(eq(forms.slug, slug));
+
+    if (form.status !== "active") throw notFound("Form not found");
+    assertAccessible(form, viewer);
+    assertWithinResponseWindow(form);
+
+    return {
+      id: form.id,
+      formTitle: form.formTitle,
+      formDescription: form.formDescription,
+      coverImageUrl: form.coverImageUrl,
+      accessType: form.accessType,
+      acceptingResponses: form.acceptingResponses,
+      recordName: form.recordName,
+      oneResponsePerPerson: form.oneResponsePerPerson,
       startDate: form.startDate,
       endDate: form.endDate,
       fields: form.formFields,
@@ -254,13 +293,7 @@ export const formService = {
       throw forbidden("This form is not currently accepting responses");
     }
 
-    const now = Date.now();
-    if (form.startDate && now < parseStoredTimestamp(form.startDate)) {
-      throw forbidden("This form is not yet accepting responses");
-    }
-    if (form.endDate && now > parseStoredTimestamp(form.endDate)) {
-      throw forbidden("This form is no longer accepting responses");
-    }
+    assertWithinResponseWindow(form);
 
     return form;
   },
@@ -289,6 +322,7 @@ export const formService = {
           organizationId: admin.organizationId,
           formTitle: input.formTitle,
           formDescription: input.formDescription,
+          coverImageUrl: input.coverImageUrl,
           status: input.status,
           accessType: input.accessType,
           acceptingResponses: input.acceptingResponses,
