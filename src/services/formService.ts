@@ -1,9 +1,10 @@
-import { and, count, desc, eq, inArray, isNull, max, type SQL } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNull, max, or, type SQL } from "drizzle-orm";
 
 import { db, fieldOptions, folders, formAllowedUsers, formFields, forms, submissions, users } from "../db/client";
 import { contentTypeForKey, extensionForMimeType, getObjectBuffer, putObject, removeObjectSafely } from "../lib/minio";
 import type { CurrentUser } from "../middleware/authMiddleware";
 import { badRequest, forbidden, notFound, unauthorized } from "../utils/errors";
+import { anonymousIdentityCode } from "../utils/helper";
 import type {
   CreateFieldOptionInput,
   CreateFormFieldInput,
@@ -94,14 +95,20 @@ async function fetchCoverImage(key: string | null) {
  * "One response per person" can only be enforced against an *identifiable*
  * viewer (a bearer token/cookie resolved to a user) — a fully anonymous visitor
  * can't be deduped, so this is only worth checking when both `oneResponsePerPerson`
- * and `viewer` are present. Same identity match `feedbackService.create` uses to
- * reject a second submission (`submissions.userId`), just read instead of enforced.
+ * and `viewer` are present. Matches whichever way `feedbackService.create` could
+ * have recorded this person: a real `userId` (recordName was on) or their
+ * `anonymousIdentityCode` (recordName was off) — same OR, read instead of enforced.
  */
 async function hasExistingSubmission(formId: number, userId: number): Promise<boolean> {
   const [existing] = await db
     .select({ id: submissions.id })
     .from(submissions)
-    .where(and(eq(submissions.formId, formId), eq(submissions.userId, userId)))
+    .where(
+      and(
+        eq(submissions.formId, formId),
+        or(eq(submissions.userId, userId), eq(submissions.anonymousCode, anonymousIdentityCode(formId, userId))),
+      ),
+    )
     .limit(1);
   return Boolean(existing);
 }

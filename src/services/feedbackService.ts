@@ -1,9 +1,9 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, or } from "drizzle-orm";
 
 import { answers, db, submissions } from "../db/client";
 import type { CurrentUser } from "../middleware/authMiddleware";
 import { badRequest, conflict, notFound } from "../utils/errors";
-import { createId } from "../utils/helper";
+import { anonymousIdentityCode, createId } from "../utils/helper";
 import type { SubmitFeedbackInput } from "../validators/feedbackValidator";
 import { formService } from "./formService";
 
@@ -29,11 +29,25 @@ export const feedbackService = {
       throw badRequest(`Missing required field(s): ${missingRequired.map((field) => field.fieldLabel).join(", ")}`);
     }
 
+    // `userId` is only stored when the form owner opted into recording who
+    // responded (`recordName`) — otherwise the submission must not be linkable to
+    // a real account. But `oneResponsePerPerson` still needs *some* way to
+    // recognise a repeat visitor even when recordName is off: `anonymousIdentityCode`
+    // is a deterministic HMAC of (formId, userId) — the same person always produces
+    // the same code (so a repeat submission is caught), but the code can't be
+    // reversed back to their userId, and can't be correlated across other forms.
+    const pseudonymousCode = viewer ? anonymousIdentityCode(form.id, viewer.id) : null;
+
     if (form.oneResponsePerPerson && viewer) {
       const existing = await db
         .select({ id: submissions.id })
         .from(submissions)
-        .where(and(eq(submissions.formId, form.id), eq(submissions.userId, viewer.id)))
+        .where(
+          and(
+            eq(submissions.formId, form.id),
+            or(eq(submissions.userId, viewer.id), eq(submissions.anonymousCode, pseudonymousCode!)),
+          ),
+        )
         .limit(1);
 
       if (existing.length > 0) {
@@ -41,21 +55,17 @@ export const feedbackService = {
       }
     }
 
-    // `userId` is the dedup anchor for oneResponsePerPerson — it must be set
-    // whenever the viewer is known, independent of `recordName` (which doesn't
-    // otherwise affect storage today; nothing yet reads it back to display a name).
-    // Tying `userId` to `recordName` instead — the old behavior — silently broke
-    // oneResponsePerPerson for every form with recordName off (the default): every
-    // submission got `userId: null`, so the dedup check above could never match.
-    const identified = Boolean(viewer);
+    const recordUser = Boolean(form.recordName && viewer);
 
     return db.transaction(async (tx) => {
       const [submission] = await tx
         .insert(submissions)
         .values({
           formId: form.id,
-          userId: identified ? viewer!.id : null,
-          anonymousCode: identified ? null : createId("resp"),
+          userId: recordUser ? viewer!.id : null,
+          // A truly anonymous guest (no viewer at all) gets a random code — there's
+          // no identity to hash, and nothing to dedup against anyway.
+          anonymousCode: recordUser ? null : (pseudonymousCode ?? createId("resp")),
           submissionStatus: "completed",
         })
         .returning();
