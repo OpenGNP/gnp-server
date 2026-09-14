@@ -1,0 +1,25 @@
+# /etc/systemd/system/gnp-server.service
+#
+# ExecStart uses the deploy user's bun install path. Confirm it with
+# `sudo -u deploy which bun` after installing bun and adjust if different.
+
+[Unit]
+Description=GNP Server (Bun/Elysia)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=deploy
+Group=deploy
+WorkingDirectory=/opt/gnp-server
+EnvironmentFile=/opt/gnp-server/.env
+ExecStart=/home/deploy/.bun/bin/bun run start
+Restart=always
+RestartSec=3
+
+# Only PORT should need to change here if 3000 is already taken; everything
+# else (DATABASE_URL, JWT_SECRET, MINIO_*, CLIENT_URL) lives in the .env file.
+
+[Install]
+WantedBy=multi-user.target

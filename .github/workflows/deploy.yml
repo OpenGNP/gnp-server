@@ -1,0 +1,48 @@
+name: Deploy Server
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+concurrency:
+  group: deploy-server
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          script_stop: true
+          script: |
+            set -e
+            cd /opt/gnp-server
+
+            git fetch origin main
+            git reset --hard origin/main
+
+            bun install --frozen-lockfile
+
+            # Schema changes are NOT auto-applied here on purpose — review and
+            # run `bun run push` by hand after a migration lands. See deploy/README.md.
+
+            sudo systemctl restart gnp-server
+
+            for i in 1 2 3 4 5; do
+              sleep 2
+              if curl -fsS http://127.0.0.1:3000/api/health; then
+                echo "gnp-server is healthy"
+                exit 0
+              fi
+            done
+
+            echo "gnp-server did not become healthy after restart" >&2
+            sudo systemctl status gnp-server --no-pager >&2
+            exit 1
