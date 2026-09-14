@@ -574,7 +574,6 @@ export const analyticsService = {
         : [];
     const metaById = new Map(topicMeta.map((meta) => [meta.id, meta]));
 
-    const FEEDBACK_SAMPLE = 15;
     const topics: ThemeTopic[] = topicIds.map((topicId) => {
       const meta = metaById.get(topicId);
       const rows = assigned.filter((row) => row.topicId === topicId);
@@ -586,7 +585,8 @@ export const analyticsService = {
       }
       const topicTotal = rows.length || 1;
 
-      const feedbackSegment: ThemeFeedbackPoint[] = rows.slice(0, FEEDBACK_SAMPLE).map((row) => ({
+      // Every point in the topic, not a sample — the panel has its own sort and filter.
+      const feedbackSegment: ThemeFeedbackPoint[] = rows.map((row) => ({
         id: String(row.id),
         sentiment: row.sentiment as Sentiment,
         severe: Boolean(row.severe),
