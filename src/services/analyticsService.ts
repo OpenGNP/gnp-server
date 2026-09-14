@@ -61,10 +61,24 @@ export type ThemeTopic = {
   feedbackSegment: ThemeFeedbackPoint[];
 };
 
+export type TopicMovementStatus = "existing" | "new" | "inactive";
+
 export type TopicMovement = {
   id: string;
   label: string;
-  volumeChange: number;
+  currentMentions: number;
+  /** This topic's average mentions per bucket, over its history up to (not including)
+   *  the latest bucket — NOT just the single bucket right before it (too narrow/noisy
+   *  a baseline on its own). */
+  previousMentions: number;
+  /** Cumulative mentions across ALL topics up to the latest bucket — same value on
+   *  every row; lets the UI show a new topic's relative size even with no % baseline. */
+  previousTotalMentions: number;
+  /** Percent change vs. this topic's own historical average. `null` when there's no
+   *  baseline to compare against (status "new" or "inactive") — a fabricated
+   *  percentage there isn't mathematically meaningful. */
+  changePercent: number | null;
+  status: TopicMovementStatus;
   positiveChange: number;
   negativeChange: number;
 };
@@ -207,6 +221,18 @@ function bucketNext(ms: number, b: TrendBucket): number {
   return Date.UTC(y + 1, 0, 1);
 }
 
+/** Start of the bucket immediately before `ms` — the calendar-aware inverse of bucketNext. */
+function bucketPrev(ms: number, b: TrendBucket): number {
+  const d = new Date(ms);
+  const y = d.getUTCFullYear();
+  const m = d.getUTCMonth();
+  const day = d.getUTCDate();
+  if (b === "day") return Date.UTC(y, m, day - 1);
+  if (b === "week") return Date.UTC(y, m, day - 7);
+  if (b === "month") return Date.UTC(y, m - 1, 1);
+  return Date.UTC(y - 1, 0, 1);
+}
+
 function bucketLabel(ms: number, b: TrendBucket): string {
   const d = new Date(ms);
   if (b === "year") return String(d.getUTCFullYear());
@@ -214,14 +240,6 @@ function bucketLabel(ms: number, b: TrendBucket): string {
     return d.toLocaleDateString("en-US", { month: "short", year: "numeric", timeZone: "UTC" });
   return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
 }
-
-const humanSpan = (spanMs: number): string => {
-  const days = Math.max(1, Math.round(spanMs / DAY_MS));
-  if (days < 14) return `${days} days`;
-  if (days < 60) return `${Math.round(days / 7)} weeks`;
-  if (days < 365 * 1.5) return `${Math.round(days / 30)} months`;
-  return `${Math.round(days / 365)} years`;
-};
 
 const SENTIMENTS: readonly Sentiment[] = ["negative", "neutral", "positive"];
 const isSentiment = (value: string | null): value is Sentiment =>
@@ -678,10 +696,18 @@ export const analyticsService = {
     const { from, to, span } = resolveFeedbackWindow(opts, earliestMs, latestMs);
     const bkt: TrendBucket = opts.bucket ?? autoBucket(span);
     const rank: TrendRank = opts.rank ?? "mentioned";
-    const prevFrom = from - span;
+    // Rising/declining topics compare the latest bucket (anchored to `to`, the
+    // latest selected date) against each topic's own historical average per bucket
+    // — not just the one bucket immediately before it, which is too narrow/noisy a
+    // baseline on its own. `prevBucketStart` just widens the row fetch below one
+    // bucket further back as a floor, in case an explicit `bucket` is coarser than
+    // the selected range (e.g. bucket "year" with a 5-day custom range).
+    const latestBucketStart = bucketStart(to, bkt);
+    const prevBucketStart = bucketPrev(latestBucketStart, bkt);
+    const prevFrom = Math.min(from - span, prevBucketStart);
 
     const rangeLabel = `${fmtDateUTC(from)} – ${fmtDateUTC(to)}`;
-    const comparisonLabel = `vs previous ${humanSpan(span)}`;
+    const comparisonLabel = `vs typical ${bkt}`;
     const fromIso = new Date(from).toISOString();
     const toIso = new Date(to).toISOString();
 
@@ -734,7 +760,10 @@ export const analyticsService = {
     if (clean.length === 0) return empty;
 
     const current = clean.filter((r) => r.t >= from);
-    const previous = clean.filter((r) => r.t < from);
+    // Bounded explicitly (not just "< from") since the row fetch below is widened
+    // to also cover the movement comparison windows, which can reach further back
+    // than one selected-range span.
+    const previous = clean.filter((r) => r.t >= from - span && r.t < from);
     // Every topic seen in *either* window — a topic can decline to zero in `current`
     // yet still be worth picking ("what stopped being mentioned").
     const topicIds = [...new Set(clean.map((r) => r.topicId))];
@@ -766,29 +795,71 @@ export const analyticsService = {
     const zero: Tally = { total: 0, neg: 0, pos: 0, severe: 0 };
     const share = (part: number, whole: number) => (whole > 0 ? (part / whole) * 100 : 0);
 
+    // Movement baseline: the latest bucket's raw count vs. each topic's own
+    // average mentions-per-bucket over its history up to that point (cumulative
+    // total ÷ periods elapsed since its first mention), NOT just the single bucket
+    // right before this one. A single narrow bucket is a noisy baseline (any topic
+    // quiet for one bucket would divide by zero or look artificially "new"); the
+    // running average stays stable and still supports real rising AND declining,
+    // unlike comparing against a raw cumulative total (which only ever grows).
+    const moveCurrent = clean.filter((r) => r.t >= latestBucketStart);
+    const moveCur = tallyBy(moveCurrent);
+    const cumulativeBefore = clean.filter((r) => r.t < latestBucketStart);
+    const cumulativeBeforeTally = tallyBy(cumulativeBefore);
+    const previousTotalMentions = cumulativeBefore.length;
+
+    const firstSeenBefore = new Map<number, number>();
+    for (const r of cumulativeBefore) {
+      const seen = firstSeenBefore.get(r.topicId);
+      if (seen === undefined || r.t < seen) firstSeenBefore.set(r.topicId, r.t);
+    }
+    // Calendar-aware period count between two timestamps (bucketNext already
+    // handles variable-length month/year buckets elsewhere in this function).
+    const countBuckets = (startMs: number, endMsExclusive: number): number => {
+      let n = 0;
+      for (let k = bucketStart(startMs, bkt); k < endMsExclusive && n < 5000; k = bucketNext(k, bkt)) {
+        n++;
+      }
+      return n;
+    };
+
     const movements: TopicMovement[] = topicIds.map((id) => {
-      const c = cur.get(id) ?? zero;
-      const p = prev.get(id) ?? zero;
-      // Stock-style: (now − before) / before, uncapped up, floored at −100% down;
-      // from a zero baseline each new mention counts as +100%.
-      const volumeChange =
-        p.total > 0 ? Math.round(((c.total - p.total) / p.total) * 100) : c.total * 100;
+      const c = moveCur.get(id) ?? zero;
+      const p = cumulativeBeforeTally.get(id) ?? zero;
+      const firstSeen = firstSeenBefore.get(id);
+      const periodsElapsed = firstSeen !== undefined ? countBuckets(firstSeen, latestBucketStart) : 0;
+      const averagePerPeriod = periodsElapsed > 0 ? p.total / periodsElapsed : 0;
+
+      const status: TopicMovementStatus =
+        p.total > 0 ? "existing" : c.total > 0 ? "new" : "inactive";
+      const changePercent =
+        status === "existing" && averagePerPeriod > 0
+          ? Math.round(((c.total - averagePerPeriod) / averagePerPeriod) * 100)
+          : null;
       return {
         id: String(id),
         label: nameOf(id),
-        volumeChange,
+        currentMentions: c.total,
+        previousMentions: Math.round(averagePerPeriod * 10) / 10,
+        previousTotalMentions,
+        changePercent,
+        status,
         positiveChange: Math.round(share(c.pos, c.total) - share(p.pos, p.total)),
         negativeChange: Math.round(share(c.neg, c.total) - share(p.neg, p.total)),
       };
     });
 
+    // "Rising" = existing topics whose current bucket beat their own historical
+    // average, plus brand-new topics — ranked together by current mention count,
+    // since a new topic has no average to compare against an existing one's growth
+    // rate on the same scale.
     const risingTopics = movements
-      .filter((m) => m.volumeChange > 0)
-      .sort((a, b) => b.volumeChange - a.volumeChange)
+      .filter((m) => m.status === "new" || (m.status === "existing" && (m.changePercent ?? 0) > 0))
+      .sort((a, b) => b.currentMentions - a.currentMentions)
       .slice(0, 5);
     const decliningTopics = movements
-      .filter((m) => m.volumeChange < 0)
-      .sort((a, b) => a.volumeChange - b.volumeChange)
+      .filter((m) => m.status === "existing" && (m.changePercent ?? 0) < 0)
+      .sort((a, b) => (a.changePercent ?? 0) - (b.changePercent ?? 0))
       .slice(0, 5);
 
     // --- topic picker: rank every in-window topic ---------------------------
@@ -845,7 +916,7 @@ export const analyticsService = {
           description:
             severe > 0
               ? `${severe} severe report${severe === 1 ? "" : "s"} flagged this period`
-              : `Negative mentions up ${m.negativeChange}% vs the previous ${humanSpan(span)}`,
+              : `Negative mentions up ${m.negativeChange}% vs typical ${bkt}`,
           riskLabel: severe > 0 ? "Critical" : "High",
         };
       });
