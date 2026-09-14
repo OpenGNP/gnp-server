@@ -197,7 +197,7 @@ async function loadFormForViewer(where: SQL) {
   });
 
   if (!form) throw notFound("Form not found");
-  return form;
+  return syncExpiredAcceptingResponses(form);
 }
 
 function assertWithinResponseWindow(form: { startDate: string | null; endDate: string | null }) {
@@ -208,6 +208,26 @@ function assertWithinResponseWindow(form: { startDate: string | null; endDate: s
   if (form.endDate && now > parseStoredTimestamp(form.endDate)) {
     throw forbidden("This form is no longer accepting responses");
   }
+}
+
+/**
+ * Lazily flips `accepting_responses` to false once the schedule's end date has
+ * passed. Submission intake doesn't depend on this — `assertWithinResponseWindow`
+ * already blocks on `endDate` directly, on every request — but admin-facing reads
+ * (the editor's "Open for answer" toggle, the publish chip) read this column, so it
+ * shouldn't keep saying "on" once the window is actually over.
+ */
+async function syncExpiredAcceptingResponses<
+  T extends { id: number; acceptingResponses: boolean; endDate: string | null },
+>(form: T): Promise<T> {
+  if (!form.acceptingResponses || !form.endDate) return form;
+  if (Date.now() <= parseStoredTimestamp(form.endDate)) return form;
+
+  // Not `touchForm` — this is a passive system correction, not an admin edit, and
+  // shouldn't reorder the dashboard's "recently updated" sort just because someone
+  // (possibly an anonymous respondent) loaded an already-expired form.
+  await db.update(forms).set({ acceptingResponses: false }).where(eq(forms.id, form.id));
+  return { ...form, acceptingResponses: false };
 }
 
 function assertAccessible(
@@ -292,7 +312,7 @@ export const formService = {
       },
     });
 
-    return form!;
+    return syncExpiredAcceptingResponses(form!);
   },
 
   /**
