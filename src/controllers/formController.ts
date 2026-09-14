@@ -6,6 +6,7 @@ import type {
   CreateFormInput,
   UpdateFormFieldInput,
   UpdateFormInput,
+  UploadCoverImageInput,
 } from "../validators/formValidator";
 
 export const formController = {
@@ -23,6 +24,26 @@ export const formController = {
 
   getPublicBySlug(slug: string, viewer: CurrentUser | null) {
     return formService.getPublicBySlug(slug, viewer);
+  },
+
+  getCoverImageForEdit(id: number, adminId: number) {
+    return formService.getCoverImageForEdit(id, adminId);
+  },
+
+  getCoverImageByToken(token: string, viewer: CurrentUser | null) {
+    return formService.getCoverImageByToken(token, viewer);
+  },
+
+  getCoverImageBySlug(slug: string, viewer: CurrentUser | null) {
+    return formService.getCoverImageBySlug(slug, viewer);
+  },
+
+  uploadCoverImage(id: number, adminId: number, input: UploadCoverImageInput) {
+    return formService.uploadCoverImage(id, adminId, input);
+  },
+
+  removeCoverImage(id: number, adminId: number) {
+    return formService.removeCoverImage(id, adminId);
   },
 
   create(admin: CurrentUser, input: CreateFormInput) {
