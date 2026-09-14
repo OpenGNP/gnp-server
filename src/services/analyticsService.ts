@@ -74,9 +74,17 @@ export type TopicMovement = {
   /** Cumulative mentions across ALL topics up to the latest bucket — same value on
    *  every row; lets the UI show a new topic's relative size even with no % baseline. */
   previousTotalMentions: number;
-  /** Percent change vs. this topic's own historical average. `null` when there's no
-   *  baseline to compare against (status "new" or "inactive") — a fabricated
-   *  percentage there isn't mathematically meaningful. */
+  /** currentMentions − previousMentions, rounded. The PRIMARY rising/declining signal
+   *  — ranking and inclusion both use this, not `changePercent`. Dividing by a small
+   *  or fractional average blows up into meaningless percentages (a topic averaging
+   *  0.1/period getting 2 mentions is "+1900%"); a plain count delta doesn't have
+   *  that failure mode and ranks topics by how much actually changed, not by how
+   *  small their baseline happened to be. */
+  delta: number;
+  /** Percent change vs. this topic's own historical average — secondary context only
+   *  (e.g. a tooltip), never used for ranking. `null` for "new"/"inactive" (no
+   *  baseline at all) and also when the baseline is too small for a percentage to
+   *  mean anything (see MIN_BASELINE_FOR_PERCENT). */
   changePercent: number | null;
   status: TopicMovementStatus;
   positiveChange: number;
@@ -823,6 +831,11 @@ export const analyticsService = {
       return n;
     };
 
+    // Percentages on a tiny/fractional average are meaningless noise (0.1/period
+    // baseline getting 2 mentions reads as "+1900%") — below this, changePercent
+    // is omitted rather than shown.
+    const MIN_BASELINE_FOR_PERCENT = 3;
+
     const movements: TopicMovement[] = topicIds.map((id) => {
       const c = moveCur.get(id) ?? zero;
       const p = cumulativeBeforeTally.get(id) ?? zero;
@@ -832,8 +845,9 @@ export const analyticsService = {
 
       const status: TopicMovementStatus =
         p.total > 0 ? "existing" : c.total > 0 ? "new" : "inactive";
+      const delta = Math.round(c.total - averagePerPeriod);
       const changePercent =
-        status === "existing" && averagePerPeriod > 0
+        status === "existing" && averagePerPeriod >= MIN_BASELINE_FOR_PERCENT
           ? Math.round(((c.total - averagePerPeriod) / averagePerPeriod) * 100)
           : null;
       return {
@@ -842,6 +856,7 @@ export const analyticsService = {
         currentMentions: c.total,
         previousMentions: Math.round(averagePerPeriod * 10) / 10,
         previousTotalMentions,
+        delta,
         changePercent,
         status,
         positiveChange: Math.round(share(c.pos, c.total) - share(p.pos, p.total)),
@@ -849,17 +864,19 @@ export const analyticsService = {
       };
     });
 
-    // "Rising" = existing topics whose current bucket beat their own historical
-    // average, plus brand-new topics — ranked together by current mention count,
-    // since a new topic has no average to compare against an existing one's growth
-    // rate on the same scale.
+    // Ranked by raw delta (mentions gained/lost vs. baseline), not percentage — a
+    // topic gaining 45 real mentions should outrank one "gaining" 2 mentions off a
+    // baseline of 0.1 just because the latter's % looks bigger. `status` doesn't
+    // need to be checked here: "new" topics always have delta = currentMentions (baseline
+    // 0) so they rank alongside existing risers on the same scale, and "inactive"
+    // topics always have delta = 0 so they're naturally excluded from both lists.
     const risingTopics = movements
-      .filter((m) => m.status === "new" || (m.status === "existing" && (m.changePercent ?? 0) > 0))
-      .sort((a, b) => b.currentMentions - a.currentMentions)
+      .filter((m) => m.delta > 0)
+      .sort((a, b) => b.delta - a.delta)
       .slice(0, 5);
     const decliningTopics = movements
-      .filter((m) => m.status === "existing" && (m.changePercent ?? 0) < 0)
-      .sort((a, b) => (a.changePercent ?? 0) - (b.changePercent ?? 0))
+      .filter((m) => m.delta < 0)
+      .sort((a, b) => a.delta - b.delta)
       .slice(0, 5);
 
     // --- topic picker: rank every in-window topic ---------------------------
