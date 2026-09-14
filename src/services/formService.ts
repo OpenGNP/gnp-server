@@ -1,6 +1,7 @@
 import { and, count, desc, eq, inArray, isNull, max, type SQL } from "drizzle-orm";
 
 import { db, fieldOptions, folders, formAllowedUsers, formFields, forms, submissions, users } from "../db/client";
+import { contentTypeForKey, extensionForMimeType, getObjectBuffer, putObject, removeObjectSafely } from "../lib/minio";
 import type { CurrentUser } from "../middleware/authMiddleware";
 import { badRequest, forbidden, notFound, unauthorized } from "../utils/errors";
 import type {
@@ -10,6 +11,7 @@ import type {
   FormFieldInput,
   UpdateFormFieldInput,
   UpdateFormInput,
+  UploadCoverImageInput,
 } from "../validators/formValidator";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -70,6 +72,22 @@ async function getOwnedForm(id: number, adminId: number) {
   if (form.adminId !== adminId) throw forbidden("You do not have access to this form");
 
   return form;
+}
+
+/**
+ * `cover_image_url` now stores an internal MinIO object key ("covers/12/...")
+ * rather than a real URL. This tells that apart from a leftover value written by
+ * the old inline-data-URL scheme, which is neither fetchable from MinIO nor safe
+ * to pass to `removeObject`.
+ */
+function isManagedCoverKey(value: string | null): value is string {
+  return typeof value === "string" && value.startsWith("covers/");
+}
+
+async function fetchCoverImage(key: string | null) {
+  if (!isManagedCoverKey(key)) throw notFound("This form has no cover image");
+  const buffer = await getObjectBuffer(key);
+  return { buffer, contentType: contentTypeForKey(key) };
 }
 
 async function assertFolderOwnership(folderId: number, adminId: number) {
@@ -298,6 +316,57 @@ export const formService = {
     return form;
   },
 
+  /** Owner-only — the editor's own preview of the cover it's currently set to. */
+  async getCoverImageForEdit(id: number, adminId: number) {
+    const form = await getOwnedForm(id, adminId);
+    return fetchCoverImage(form.coverImageUrl);
+  },
+
+  /** Same accessType gate as getPublicByToken — a respondent only sees the cover if they can see the form. */
+  async getCoverImageByToken(token: string, viewer: CurrentUser | null) {
+    const form = await loadFormForViewer(eq(forms.publicToken, token));
+    if (form.status !== "active") throw notFound("Form not found");
+    assertAccessible(form, viewer);
+    return fetchCoverImage(form.coverImageUrl);
+  },
+
+  /** Same accessType gate as getPublicBySlug. */
+  async getCoverImageBySlug(slug: string, viewer: CurrentUser | null) {
+    const form = await loadFormForViewer(eq(forms.slug, slug));
+    if (form.status !== "active") throw notFound("Form not found");
+    assertAccessible(form, viewer);
+    return fetchCoverImage(form.coverImageUrl);
+  },
+
+  /** Uploads a new cover to MinIO, points the form at it, and deletes the old object (if any). */
+  async uploadCoverImage(id: number, adminId: number, input: UploadCoverImageInput) {
+    const form = await getOwnedForm(id, adminId);
+
+    const ext = extensionForMimeType(input.file.type) ?? "bin";
+    const key = `covers/${id}/${Date.now()}-${crypto.randomUUID()}.${ext}`;
+    const buffer = Buffer.from(await input.file.arrayBuffer());
+
+    await putObject(key, buffer, input.file.type);
+    await db.update(forms).set({ coverImageUrl: key, updatedAt: nowIso() }).where(eq(forms.id, id));
+
+    if (isManagedCoverKey(form.coverImageUrl)) {
+      await removeObjectSafely(form.coverImageUrl);
+    }
+
+    return { coverImageUrl: key };
+  },
+
+  /** Clears the form's cover and deletes the underlying object (if any). */
+  async removeCoverImage(id: number, adminId: number) {
+    const form = await getOwnedForm(id, adminId);
+
+    if (isManagedCoverKey(form.coverImageUrl)) {
+      await removeObjectSafely(form.coverImageUrl);
+    }
+
+    await db.update(forms).set({ coverImageUrl: null, updatedAt: nowIso() }).where(eq(forms.id, id));
+  },
+
   async create(admin: CurrentUser, input: CreateFormInput) {
     if (input.folderId !== undefined) {
       await assertFolderOwnership(input.folderId, admin.id);
@@ -322,7 +391,6 @@ export const formService = {
           organizationId: admin.organizationId,
           formTitle: input.formTitle,
           formDescription: input.formDescription,
-          coverImageUrl: input.coverImageUrl,
           status: input.status,
           accessType: input.accessType,
           acceptingResponses: input.acceptingResponses,
@@ -399,8 +467,14 @@ export const formService = {
   },
 
   async remove(id: number, adminId: number) {
-    await getOwnedForm(id, adminId);
+    const form = await getOwnedForm(id, adminId);
     await db.delete(forms).where(eq(forms.id, id));
+
+    // Deleting the row doesn't delete the object it pointed at — clean it up so a
+    // removed form doesn't leave an orphaned cover behind in MinIO.
+    if (isManagedCoverKey(form.coverImageUrl)) {
+      await removeObjectSafely(form.coverImageUrl);
+    }
   },
 
   async addField(formId: number, adminId: number, input: CreateFormFieldInput) {

@@ -12,10 +12,23 @@ import {
   reorderFormsSchema,
   updateFormFieldSchema,
   updateFormSchema,
+  uploadCoverImageSchema,
 } from "../validators/formValidator";
 
 const tags = ["Forms"];
 const security = [{ bearerAuth: [] }];
+
+/** Raw binary response for a cover image — bypasses the {success,message,data} envelope on purpose. */
+function coverImageResponse({ buffer, contentType }: { buffer: Buffer; contentType: string }) {
+  return new Response(buffer, {
+    headers: {
+      "Content-Type": contentType,
+      // Private: access is gated per-viewer, so a shared/CDN cache must never serve
+      // one viewer's fetch to another. Short TTL since a cover can be replaced.
+      "Cache-Control": "private, max-age=300",
+    },
+  });
+}
 
 const publicFormRoutes = new Elysia()
   .use(optionalAuth)
@@ -50,6 +63,36 @@ const publicFormRoutes = new Elysia()
           "Used for shareable `/form/{slug}` links. Enforces status, accessType, and the form's " +
           "start/end date window, in addition to the same optional-Bearer access checks as the " +
           "public-token endpoint.",
+      },
+    },
+  )
+  .get(
+    "/public/:token/cover-image",
+    async ({ params, currentUser }) => {
+      const image = await formController.getCoverImageByToken(params.token, currentUser);
+      return coverImageResponse(image);
+    },
+    {
+      detail: {
+        tags,
+        summary: "Get a form's cover image by public token",
+        description:
+          "Same accessType gate as GET /public/:token — the raw image bytes, not the JSON envelope. " +
+          "404 if the form has no cover set.",
+      },
+    },
+  )
+  .get(
+    "/slug/:slug/cover-image",
+    async ({ params, currentUser }) => {
+      const image = await formController.getCoverImageBySlug(params.slug, currentUser);
+      return coverImageResponse(image);
+    },
+    {
+      detail: {
+        tags,
+        summary: "Get a form's cover image by slug",
+        description: "Same accessType gate as GET /slug/:slug.",
       },
     },
   );
@@ -119,6 +162,53 @@ const adminFormRoutes = new Elysia()
       return successResponse("Form deleted successfully", null);
     },
     { detail: { tags, security, summary: "Delete a form" } },
+  )
+  .get(
+    "/:id/cover-image",
+    async ({ params, currentUser }) => {
+      assertCurrentUser(currentUser);
+      const id = parseIntParam(params.id, "form id");
+      const image = await formController.getCoverImageForEdit(id, currentUser.id);
+      return coverImageResponse(image);
+    },
+    {
+      detail: {
+        tags,
+        security,
+        summary: "Get the cover image for a form I own (editor preview)",
+        description: "The raw image bytes, not the JSON envelope. 404 if no cover is set.",
+      },
+    },
+  )
+  .post(
+    "/:id/cover-image",
+    async ({ params, body, currentUser }) => {
+      assertCurrentUser(currentUser);
+      const id = parseIntParam(params.id, "form id");
+      const data = await formController.uploadCoverImage(id, currentUser.id, body);
+      return successResponse("Cover image uploaded successfully", data);
+    },
+    {
+      body: uploadCoverImageSchema,
+      detail: {
+        tags,
+        security,
+        summary: "Upload (or replace) a form's cover image",
+        description:
+          "multipart/form-data with a `file` field (png/jpeg/webp/gif, max 5MB). Stored in MinIO under a " +
+          "generated key, never as a raw client-supplied URL; the previous cover (if any) is deleted.",
+      },
+    },
+  )
+  .delete(
+    "/:id/cover-image",
+    async ({ params, currentUser }) => {
+      assertCurrentUser(currentUser);
+      const id = parseIntParam(params.id, "form id");
+      await formController.removeCoverImage(id, currentUser.id);
+      return successResponse("Cover image removed successfully", null);
+    },
+    { detail: { tags, security, summary: "Remove a form's cover image" } },
   )
   .patch(
     "/reorder",

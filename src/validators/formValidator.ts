@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { ALLOWED_COVER_IMAGE_MIME_TYPES } from "../lib/minio";
+
 const dateStringSchema = z
   .string()
   .trim()
@@ -38,15 +40,10 @@ const formFieldSchema = z.object({
   options: z.array(fieldOptionSchema).optional(),
 });
 
-// A data: URL cover image is stored inline (no file-hosting infra), so the cap here
-// bounds the base64 payload size rather than a URL length — ~3.5MB of source image.
-const coverImageUrlSchema = z.string().trim().max(5_000_000);
-
 export const createFormSchema = z.object({
   folderId: z.number().int().positive().optional(),
   formTitle: z.string().trim().min(1).max(255),
   formDescription: z.string().trim().max(2000).optional(),
-  coverImageUrl: coverImageUrlSchema.optional(),
   status: formStatusEnum.default("draft"),
   accessType: formAccessTypeEnum.default("organization"),
   acceptingResponses: z.boolean().default(false),
@@ -67,11 +64,14 @@ export const createFormSchema = z.object({
 // options) in one transaction — see formService.update. It is refused when the
 // form already has submissions so an edit to unrelated settings can't cascade-
 // delete answers.
+//
+// `coverImageUrl` is deliberately NOT settable here — it's an internal MinIO
+// object key, not something a client should ever write directly. It's managed
+// exclusively through POST/DELETE /forms/:id/cover-image (see formService.ts).
 export const updateFormSchema = z.object({
   folderId: z.number().int().positive().nullable().optional(),
   formTitle: z.string().trim().min(1).max(255).optional(),
   formDescription: z.string().trim().max(2000).optional(),
-  coverImageUrl: coverImageUrlSchema.nullable().optional(),
   status: formStatusEnum.optional(),
   accessType: formAccessTypeEnum.optional(),
   acceptingResponses: z.boolean().optional(),
@@ -97,6 +97,15 @@ export const updateFormFieldSchema = z.object({
 
 export const createFieldOptionSchema = fieldOptionSchema;
 
+// multipart/form-data body for POST /forms/:id/cover-image. Elysia parses the file
+// field into a native `File` before this ever runs; z.file() just validates it.
+export const uploadCoverImageSchema = z.object({
+  file: z
+    .file()
+    .mime(ALLOWED_COVER_IMAGE_MIME_TYPES)
+    .max(5 * 1024 * 1024, "Image must be 5MB or smaller"),
+});
+
 export const reorderFieldsSchema = z.object({
   fieldIds: z.array(z.number().int().positive()).min(1),
 });
@@ -118,3 +127,4 @@ export type UpdateFormFieldInput = z.infer<typeof updateFormFieldSchema>;
 export type CreateFieldOptionInput = z.infer<typeof createFieldOptionSchema>;
 export type FormFieldInput = z.infer<typeof formFieldSchema>;
 export type ReorderFormsInput = z.infer<typeof reorderFormsSchema>;
+export type UploadCoverImageInput = z.infer<typeof uploadCoverImageSchema>;
