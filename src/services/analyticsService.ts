@@ -39,6 +39,8 @@ export type ThemeKeyword = { text: string; weight: 1 | 2 | 3 };
 export type ThemeFeedbackPoint = {
   id: string;
   sentiment: Sentiment;
+  /** The AI pipeline flagged this point as reporting a legal, ethical or moral breach. */
+  severe: boolean;
   quote: string;
   originalFeedback: string;
   submittedAt: string;
@@ -587,6 +589,7 @@ export const analyticsService = {
       const feedbackSegment: ThemeFeedbackPoint[] = rows.slice(0, FEEDBACK_SAMPLE).map((row) => ({
         id: String(row.id),
         sentiment: row.sentiment as Sentiment,
+        severe: Boolean(row.severe),
         quote: row.pointText ?? "",
         originalFeedback: row.originalFeedback ?? row.pointText ?? "",
         submittedAt: row.submittedAt ?? new Date().toISOString(),
@@ -602,7 +605,7 @@ export const analyticsService = {
         neutral: counts.neutral,
         positive: counts.positive,
         percentOfTotal: Math.round((rows.length / assignedTotal) * 1000) / 10,
-        isHighIntensity: severe > 0 || (counts.negative / topicTotal >= 0.5 && rows.length >= 3),
+        isHighIntensity: severe > 0,
         aiSummary: meta?.summary ?? "",
         keywords: parseKeywords(meta?.keywords ?? null),
         feedbackSegment,
