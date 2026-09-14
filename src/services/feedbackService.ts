@@ -41,15 +41,21 @@ export const feedbackService = {
       }
     }
 
-    const recordUser = Boolean(form.recordName && viewer);
+    // `userId` is the dedup anchor for oneResponsePerPerson — it must be set
+    // whenever the viewer is known, independent of `recordName` (which doesn't
+    // otherwise affect storage today; nothing yet reads it back to display a name).
+    // Tying `userId` to `recordName` instead — the old behavior — silently broke
+    // oneResponsePerPerson for every form with recordName off (the default): every
+    // submission got `userId: null`, so the dedup check above could never match.
+    const identified = Boolean(viewer);
 
     return db.transaction(async (tx) => {
       const [submission] = await tx
         .insert(submissions)
         .values({
           formId: form.id,
-          userId: recordUser ? viewer!.id : null,
-          anonymousCode: recordUser ? null : createId("resp"),
+          userId: identified ? viewer!.id : null,
+          anonymousCode: identified ? null : createId("resp"),
           submissionStatus: "completed",
         })
         .returning();

@@ -90,6 +90,22 @@ async function fetchCoverImage(key: string | null) {
   return { buffer, contentType: contentTypeForKey(key) };
 }
 
+/**
+ * "One response per person" can only be enforced against an *identifiable*
+ * viewer (a bearer token/cookie resolved to a user) — a fully anonymous visitor
+ * can't be deduped, so this is only worth checking when both `oneResponsePerPerson`
+ * and `viewer` are present. Same identity match `feedbackService.create` uses to
+ * reject a second submission (`submissions.userId`), just read instead of enforced.
+ */
+async function hasExistingSubmission(formId: number, userId: number): Promise<boolean> {
+  const [existing] = await db
+    .select({ id: submissions.id })
+    .from(submissions)
+    .where(and(eq(submissions.formId, formId), eq(submissions.userId, userId)))
+    .limit(1);
+  return Boolean(existing);
+}
+
 async function assertFolderOwnership(folderId: number, adminId: number) {
   const [folder] = await db
     .select({ adminId: folders.adminId })
@@ -258,6 +274,9 @@ export const formService = {
     if (form.status !== "active") throw notFound("Form not found");
     assertAccessible(form, viewer);
 
+    const alreadyResponded =
+      form.oneResponsePerPerson && viewer ? await hasExistingSubmission(form.id, viewer.id) : false;
+
     return {
       id: form.id,
       formTitle: form.formTitle,
@@ -267,8 +286,10 @@ export const formService = {
       acceptingResponses: form.acceptingResponses,
       recordName: form.recordName,
       oneResponsePerPerson: form.oneResponsePerPerson,
+      alreadyResponded,
       startDate: form.startDate,
       endDate: form.endDate,
+      updatedAt: form.updatedAt,
       fields: form.formFields,
     };
   },
@@ -285,6 +306,9 @@ export const formService = {
     assertAccessible(form, viewer);
     assertWithinResponseWindow(form);
 
+    const alreadyResponded =
+      form.oneResponsePerPerson && viewer ? await hasExistingSubmission(form.id, viewer.id) : false;
+
     return {
       id: form.id,
       formTitle: form.formTitle,
@@ -294,8 +318,10 @@ export const formService = {
       acceptingResponses: form.acceptingResponses,
       recordName: form.recordName,
       oneResponsePerPerson: form.oneResponsePerPerson,
+      alreadyResponded,
       startDate: form.startDate,
       endDate: form.endDate,
+      updatedAt: form.updatedAt,
       fields: form.formFields,
     };
   },
