@@ -34,8 +34,9 @@ const publicFormRoutes = new Elysia()
   .use(optionalAuth)
   .get(
     "/public/:token",
-    async ({ params, currentUser }) => {
-      const data = await formController.getPublicByToken(params.token, currentUser);
+    async ({ params, query, currentUser }) => {
+      const deviceId = typeof query.deviceId === "string" ? query.deviceId : undefined;
+      const data = await formController.getPublicByToken(params.token, currentUser, deviceId);
       return successResponse("Form loaded successfully", data);
     },
     {
@@ -45,14 +46,16 @@ const publicFormRoutes = new Elysia()
         description:
           "Looked up by the form's unguessable public token (not its id), so a shared link can't be " +
           "enumerated. Enforces status and accessType; an optional Bearer token checks " +
-          "organization/specific-people access but isn't required for public forms.",
+          "organization/specific-people access but isn't required for public forms. Query `deviceId` " +
+          "(no Bearer token) lets `alreadyResponded` work for a fully anonymous respondent too.",
       },
     },
   )
   .get(
     "/slug/:slug",
-    async ({ params, currentUser }) => {
-      const data = await formController.getPublicBySlug(params.slug, currentUser);
+    async ({ params, query, currentUser }) => {
+      const deviceId = typeof query.deviceId === "string" ? query.deviceId : undefined;
+      const data = await formController.getPublicBySlug(params.slug, currentUser, deviceId);
       return successResponse("Form loaded successfully", data);
     },
     {
@@ -61,8 +64,8 @@ const publicFormRoutes = new Elysia()
         summary: "Get the respondent-facing view of a form by its human-readable slug",
         description:
           "Used for shareable `/form/{slug}` links. Enforces status, accessType, and the form's " +
-          "start/end date window, in addition to the same optional-Bearer access checks as the " +
-          "public-token endpoint.",
+          "start/end date window, in addition to the same optional-Bearer access checks and " +
+          "`deviceId` query param as the public-token endpoint.",
       },
     },
   )

@@ -32,20 +32,30 @@ export const feedbackService = {
     // `userId` is only stored when the form owner opted into recording who
     // responded (`recordName`) — otherwise the submission must not be linkable to
     // a real account. But `oneResponsePerPerson` still needs *some* way to
-    // recognise a repeat visitor even when recordName is off: `anonymousIdentityCode`
-    // is a deterministic HMAC of (formId, userId) — the same person always produces
-    // the same code (so a repeat submission is caught), but the code can't be
-    // reversed back to their userId, and can't be correlated across other forms.
-    const pseudonymousCode = viewer ? anonymousIdentityCode(form.id, viewer.id) : null;
+    // recognise a repeat visitor even when recordName is off (or there's no
+    // account at all — a fully public form): `anonymousIdentityCode` is a
+    // deterministic HMAC of (formId, identity) — the same person always produces
+    // the same code, but it can't be reversed back to their identity, and can't
+    // be correlated across other forms. `identity` is the signed-in viewer's id
+    // when there is one, else the respondent's client-generated `deviceId` (a
+    // random token their browser persists) — same soft, best-effort dedup either
+    // way; a device id doesn't survive cleared storage/incognito/another device.
+    const pseudonymousCode = viewer
+      ? anonymousIdentityCode(form.id, String(viewer.id))
+      : input.deviceId
+        ? anonymousIdentityCode(form.id, input.deviceId)
+        : null;
 
-    if (form.oneResponsePerPerson && viewer) {
+    if (form.oneResponsePerPerson && pseudonymousCode) {
       const existing = await db
         .select({ id: submissions.id })
         .from(submissions)
         .where(
           and(
             eq(submissions.formId, form.id),
-            or(eq(submissions.userId, viewer.id), eq(submissions.anonymousCode, pseudonymousCode!)),
+            viewer
+              ? or(eq(submissions.userId, viewer.id), eq(submissions.anonymousCode, pseudonymousCode))
+              : eq(submissions.anonymousCode, pseudonymousCode),
           ),
         )
         .limit(1);

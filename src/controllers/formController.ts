@@ -18,12 +18,12 @@ export const formController = {
     return formService.getForEdit(id, adminId);
   },
 
-  getPublicByToken(token: string, viewer: CurrentUser | null) {
-    return formService.getPublicByToken(token, viewer);
+  getPublicByToken(token: string, viewer: CurrentUser | null, deviceId?: string) {
+    return formService.getPublicByToken(token, viewer, deviceId);
   },
 
-  getPublicBySlug(slug: string, viewer: CurrentUser | null) {
-    return formService.getPublicBySlug(slug, viewer);
+  getPublicBySlug(slug: string, viewer: CurrentUser | null, deviceId?: string) {
+    return formService.getPublicBySlug(slug, viewer, deviceId);
   },
 
   getCoverImageForEdit(id: number, adminId: number) {

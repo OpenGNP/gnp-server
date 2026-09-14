@@ -92,25 +92,50 @@ async function fetchCoverImage(key: string | null) {
 }
 
 /**
- * "One response per person" can only be enforced against an *identifiable*
- * viewer (a bearer token/cookie resolved to a user) — a fully anonymous visitor
- * can't be deduped, so this is only worth checking when both `oneResponsePerPerson`
- * and `viewer` are present. Matches whichever way `feedbackService.create` could
- * have recorded this person: a real `userId` (recordName was on) or their
- * `anonymousIdentityCode` (recordName was off) — same OR, read instead of enforced.
+ * "One response per person" can be checked for a signed-in viewer (a real
+ * `userId`) or a fully anonymous respondent identified only by a client-generated
+ * `deviceId` (see feedbackService.create) — with neither, there's nothing to
+ * check against. Matches whichever way a submission could have been recorded: a
+ * real `userId` (recordName was on) or the identity's `anonymousIdentityCode`
+ * (recordName was off, or the respondent was never signed in) — same OR
+ * `feedbackService.create` uses to reject a resubmit, read instead of enforced.
  */
-async function hasExistingSubmission(formId: number, userId: number): Promise<boolean> {
+async function hasExistingSubmission(
+  formId: number,
+  identity: { userId: number } | { deviceId: string },
+): Promise<boolean> {
+  const pseudonymousCode =
+    "userId" in identity
+      ? anonymousIdentityCode(formId, String(identity.userId))
+      : anonymousIdentityCode(formId, identity.deviceId);
+
   const [existing] = await db
     .select({ id: submissions.id })
     .from(submissions)
     .where(
       and(
         eq(submissions.formId, formId),
-        or(eq(submissions.userId, userId), eq(submissions.anonymousCode, anonymousIdentityCode(formId, userId))),
+        "userId" in identity
+          ? or(eq(submissions.userId, identity.userId), eq(submissions.anonymousCode, pseudonymousCode))
+          : eq(submissions.anonymousCode, pseudonymousCode),
       ),
     )
     .limit(1);
   return Boolean(existing);
+}
+
+/** Resolves `alreadyResponded` for the public-view payloads: a signed-in viewer
+ *  is checked by their user id, a fully anonymous visitor by their client-issued
+ *  `deviceId` (query param — there's no submission body to carry it on a GET). */
+async function checkAlreadyResponded(
+  form: { id: number; oneResponsePerPerson: boolean | null },
+  viewer: CurrentUser | null,
+  deviceId?: string,
+): Promise<boolean> {
+  if (!form.oneResponsePerPerson) return false;
+  if (viewer) return hasExistingSubmission(form.id, { userId: viewer.id });
+  if (deviceId) return hasExistingSubmission(form.id, { deviceId });
+  return false;
 }
 
 async function assertFolderOwnership(folderId: number, adminId: number) {
@@ -275,14 +300,13 @@ export const formService = {
    * sequential id) so a shared link can't be enumerated. Still returns the numeric
    * `id` — a respondent needs it to POST their answers.
    */
-  async getPublicByToken(token: string, viewer: CurrentUser | null) {
+  async getPublicByToken(token: string, viewer: CurrentUser | null, deviceId?: string) {
     const form = await loadFormForViewer(eq(forms.publicToken, token));
 
     if (form.status !== "active") throw notFound("Form not found");
     assertAccessible(form, viewer);
 
-    const alreadyResponded =
-      form.oneResponsePerPerson && viewer ? await hasExistingSubmission(form.id, viewer.id) : false;
+    const alreadyResponded = await checkAlreadyResponded(form, viewer, deviceId);
 
     return {
       id: form.id,
@@ -306,15 +330,14 @@ export const formService = {
    * shared as `/form/{slug}`. Same status/access rules as `getPublicByToken`, plus the
    * start/end date window — a slug link only resolves while the form is actually open.
    */
-  async getPublicBySlug(slug: string, viewer: CurrentUser | null) {
+  async getPublicBySlug(slug: string, viewer: CurrentUser | null, deviceId?: string) {
     const form = await loadFormForViewer(eq(forms.slug, slug));
 
     if (form.status !== "active") throw notFound("Form not found");
     assertAccessible(form, viewer);
     assertWithinResponseWindow(form);
 
-    const alreadyResponded =
-      form.oneResponsePerPerson && viewer ? await hasExistingSubmission(form.id, viewer.id) : false;
+    const alreadyResponded = await checkAlreadyResponded(form, viewer, deviceId);
 
     return {
       id: form.id,
