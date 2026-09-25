@@ -1,0 +1,24 @@
+# Lives on the VPS at /opt/gnp/docker-compose.yml (copied there once during
+# setup — see setup.sh / README.md). Pulls pre-built images from GHCR; nothing
+# is built on the VPS itself.
+#
+# gnp-client's nginx reaches gnp-server by service name ("gnp-server") over the
+# default Compose network — see ../../gnp-client/deploy/nginx.conf.
+
+services:
+  gnp-server:
+    image: ghcr.io/opengnp/gnp-server:latest
+    restart: unless-stopped
+    env_file: .env
+    # Bound to loopback only — not public. gnp-client's nginx is the public
+    # entrypoint; this just lets the deploy script health-check directly.
+    ports:
+      - "127.0.0.1:3000:3000"
+
+  gnp-client:
+    image: ghcr.io/opengnp/gnp-client:latest
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - gnp-server
