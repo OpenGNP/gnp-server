@@ -1,0 +1,11 @@
+node_modules
+.git
+.env
+.env.*
+!.env.example
+dist
+out
+*.tsbuildinfo
+.DS_Store
+.cursor
+deploy
