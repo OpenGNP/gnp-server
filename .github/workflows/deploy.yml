@@ -13,7 +13,7 @@ env:
   IMAGE: ghcr.io/opengnp/gnp-server
 
 jobs:
-  build-and-deploy:
+  build-and-push:
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -39,32 +39,29 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Deploy over SSH
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: ${{ secrets.SSH_PORT || 22 }}
-          script_stop: true
-          script: |
-            set -e
-            cd /home/deploy/gnp
+  deploy:
+    needs: build-and-push
+    runs-on: self-hosted
+    steps:
+      - name: Deploy
+        run: |
+          set -e
+          cd /home/deploy/gnp
 
-            docker compose pull gnp-server
-            docker compose up -d gnp-server
+          docker compose pull gnp-server
+          docker compose up -d gnp-server
 
-            # Schema changes are NOT auto-applied here on purpose — review and
-            # run `bun run push` by hand after a migration lands. See deploy/README.md.
+          # Schema changes are NOT auto-applied here on purpose — review and
+          # run `bun run push` by hand after a migration lands. See deploy/README.md.
 
-            for i in 1 2 3 4 5; do
-              sleep 2
-              if curl -fsS http://127.0.0.1:3000/api/health; then
-                echo "gnp-server is healthy"
-                exit 0
-              fi
-            done
+          for i in 1 2 3 4 5; do
+            sleep 2
+            if curl -fsS http://127.0.0.1:3000/api/health; then
+              echo "gnp-server is healthy"
+              exit 0
+            fi
+          done
 
-            echo "gnp-server did not become healthy after restart" >&2
-            docker compose logs --tail=50 gnp-server >&2
-            exit 1
+          echo "gnp-server did not become healthy after restart" >&2
+          docker compose logs --tail=50 gnp-server >&2
+          exit 1
