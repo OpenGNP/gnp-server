@@ -25,7 +25,6 @@ import {
   organizations,
   points,
   submissions,
-  topicTrends,
   users,
 } from "../db/schema";
 import { hashPassword } from "../utils/password";
@@ -615,7 +614,7 @@ async function main() {
     await textFor(facilityField, FACILITY_RESPONSES);
   }
 
-  // Topic sizes + one trend row per topic for this form's window.
+  // Topic sizes (trends are computed from `points` at read time).
   for (const topicId of topicIds.values()) {
     const topicPoints = allPoints.filter((p) => p.topicId === topicId);
     if (topicPoints.length === 0) continue;
@@ -624,18 +623,6 @@ async function main() {
       .update(canonicalTopics)
       .set({ topicSize: topicPoints.length, lastUpdatedAt: daysAgo(0) })
       .where(eq(canonicalTopics.id, topicId));
-
-    await db.insert(topicTrends).values({
-      canonicalTopicId: topicId,
-      periodStart: daysAgo(startDaysAgo),
-      periodEnd: daysAgo(0),
-      feedbackCount: topicPoints.length,
-      positiveCount: topicPoints.filter((p) => p.sentiment === "positive").length,
-      neutralCount: topicPoints.filter((p) => p.sentiment === "neutral").length,
-      negativeCount: topicPoints.filter((p) => p.sentiment === "negative").length,
-      severeCount: topicPoints.filter((p) => p.severe).length,
-      createdAt: daysAgo(0),
-    });
   }
 
   console.log(

@@ -4,550 +4,6 @@
   "version": "7",
   "dialect": "postgresql",
   "tables": {
-    "public.answers": {
-      "name": "answers",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "serial",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "submission_id": {
-          "name": "submission_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "field_id": {
-          "name": "field_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "answer_text": {
-          "name": "answer_text",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "answer_option_id": {
-          "name": "answer_option_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "fk_answer_submission": {
-          "name": "fk_answer_submission",
-          "tableFrom": "answers",
-          "tableTo": "submissions",
-          "schemaTo": "public",
-          "columnsFrom": [
-            "submission_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "fk_answer_field": {
-          "name": "fk_answer_field",
-          "tableFrom": "answers",
-          "tableTo": "form_fields",
-          "schemaTo": "public",
-          "columnsFrom": [
-            "field_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "fk_answer_option": {
-          "name": "fk_answer_option",
-          "tableFrom": "answers",
-          "tableTo": "field_options",
-          "schemaTo": "public",
-          "columnsFrom": [
-            "answer_option_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {},
-      "policies": {},
-      "isRLSEnabled": false
-    },
-    "public.topic_trends": {
-      "name": "topic_trends",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "serial",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "canonical_topic_id": {
-          "name": "canonical_topic_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "period_start": {
-          "name": "period_start",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "period_end": {
-          "name": "period_end",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "feedback_count": {
-          "name": "feedback_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "positive_count": {
-          "name": "positive_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "neutral_count": {
-          "name": "neutral_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "negative_count": {
-          "name": "negative_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "severe_count": {
-          "name": "severe_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "fk_topic_trend": {
-          "name": "fk_topic_trend",
-          "tableFrom": "topic_trends",
-          "tableTo": "canonical_topics",
-          "schemaTo": "public",
-          "columnsFrom": [
-            "canonical_topic_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {},
-      "policies": {},
-      "isRLSEnabled": false
-    },
-    "public.points": {
-      "name": "points",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "serial",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "answer_id": {
-          "name": "answer_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "canonical_topic_id": {
-          "name": "canonical_topic_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "point_text": {
-          "name": "point_text",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "embedding": {
-          "name": "embedding",
-          "type": "vector",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "sentiment_label": {
-          "name": "sentiment_label",
-          "type": "varchar(20)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "is_severe": {
-          "name": "is_severe",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "assignment_confidence": {
-          "name": "assignment_confidence",
-          "type": "real",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "processing_status": {
-          "name": "processing_status",
-          "type": "varchar(30)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "fk_point_answer": {
-          "name": "fk_point_answer",
-          "tableFrom": "points",
-          "tableTo": "answers",
-          "schemaTo": "public",
-          "columnsFrom": [
-            "answer_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "fk_point_topic": {
-          "name": "fk_point_topic",
-          "tableFrom": "points",
-          "tableTo": "canonical_topics",
-          "schemaTo": "public",
-          "columnsFrom": [
-            "canonical_topic_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {},
-      "policies": {},
-      "isRLSEnabled": false
-    },
-    "public.canonical_topics": {
-      "name": "canonical_topics",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "serial",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "canonical_name": {
-          "name": "canonical_name",
-          "type": "varchar(255)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "canonical_summary": {
-          "name": "canonical_summary",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "representative_keywords": {
-          "name": "representative_keywords",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "centroid_vector": {
-          "name": "centroid_vector",
-          "type": "vector",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "topic_size": {
-          "name": "topic_size",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "status": {
-          "name": "status",
-          "type": "varchar(20)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "first_detected_at": {
-          "name": "first_detected_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "last_updated_at": {
-          "name": "last_updated_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {},
-      "policies": {},
-      "isRLSEnabled": false
-    },
-    "public.topic_versions": {
-      "name": "topic_versions",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "serial",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "canonical_topic_id": {
-          "name": "canonical_topic_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "generated_title": {
-          "name": "generated_title",
-          "type": "varchar(255)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "generated_summary": {
-          "name": "generated_summary",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "representative_keywords": {
-          "name": "representative_keywords",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "model_version": {
-          "name": "model_version",
-          "type": "varchar(100)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "fk_topic_version": {
-          "name": "fk_topic_version",
-          "tableFrom": "topic_versions",
-          "tableTo": "canonical_topics",
-          "schemaTo": "public",
-          "columnsFrom": [
-            "canonical_topic_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {},
-      "policies": {},
-      "isRLSEnabled": false
-    },
-    "public.unassigned_points": {
-      "name": "unassigned_points",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "serial",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "point_id": {
-          "name": "point_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "embedding": {
-          "name": "embedding",
-          "type": "vector",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "reason": {
-          "name": "reason",
-          "type": "varchar(100)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "fk_unassigned_point": {
-          "name": "fk_unassigned_point",
-          "tableFrom": "unassigned_points",
-          "tableTo": "points",
-          "schemaTo": "public",
-          "columnsFrom": [
-            "point_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {},
-      "policies": {},
-      "isRLSEnabled": false
-    },
-    "public.ai_model_runs": {
-      "name": "ai_model_runs",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "serial",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "model_name": {
-          "name": "model_name",
-          "type": "varchar(100)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "model_version": {
-          "name": "model_version",
-          "type": "varchar(100)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "embedding_model": {
-          "name": "embedding_model",
-          "type": "varchar(100)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "clustering_algorithm": {
-          "name": "clustering_algorithm",
-          "type": "varchar(100)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "parameters": {
-          "name": "parameters",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "started_at": {
-          "name": "started_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "completed_at": {
-          "name": "completed_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {},
-      "policies": {},
-      "isRLSEnabled": false
-    },
     "public.organizations": {
       "name": "organizations",
       "schema": "",
@@ -574,7 +30,15 @@
           "name": "created_at",
           "type": "timestamp",
           "primaryKey": false,
-          "notNull": false
+          "notNull": false,
+          "default": "CURRENT_TIMESTAMP"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "CURRENT_TIMESTAMP"
         }
       },
       "indexes": {},
@@ -629,10 +93,35 @@
           "name": "created_at",
           "type": "timestamp",
           "primaryKey": false,
-          "notNull": false
+          "notNull": false,
+          "default": "CURRENT_TIMESTAMP"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "CURRENT_TIMESTAMP"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "idx_users_organization_id": {
+          "name": "idx_users_organization_id",
+          "columns": [
+            {
+              "expression": "organization_id",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "int4_ops",
+              "isExpression": false
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "fk_user_organization": {
           "name": "fk_user_organization",
@@ -651,7 +140,513 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
+      "checkConstraints": {
+        "chk_role": {
+          "name": "chk_role",
+          "value": "(role)::text = ANY ((ARRAY['user'::character varying, 'staff'::character varying, 'admin'::character varying, 'superadmin'::character varying])::text[])"
+        }
+      },
+      "policies": {},
+      "isRLSEnabled": false
+    },
+    "public.submissions": {
+      "name": "submissions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "form_id": {
+          "name": "form_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "anonymous_code": {
+          "name": "anonymous_code",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "respondent_name": {
+          "name": "respondent_name",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "submission_status": {
+          "name": "submission_status",
+          "type": "varchar(30)",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'submitted'"
+        },
+        "ai_attempts": {
+          "name": "ai_attempts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "ai_error": {
+          "name": "ai_error",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "processing_started_at": {
+          "name": "processing_started_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "CURRENT_TIMESTAMP"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      },
+      "indexes": {
+        "idx_submissions_ai_queue": {
+          "name": "idx_submissions_ai_queue",
+          "columns": [
+            {
+              "expression": "created_at",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "timestamp_ops",
+              "isExpression": false
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "where": "((submission_status)::text = ANY ((ARRAY['submitted'::character varying, 'processing'::character varying])::text[]))",
+          "with": {}
+        },
+        "idx_submissions_form_id": {
+          "name": "idx_submissions_form_id",
+          "columns": [
+            {
+              "expression": "form_id",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "int4_ops",
+              "isExpression": false
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_submissions_user_id": {
+          "name": "idx_submissions_user_id",
+          "columns": [
+            {
+              "expression": "user_id",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "int4_ops",
+              "isExpression": false
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "fk_submission_form": {
+          "name": "fk_submission_form",
+          "tableFrom": "submissions",
+          "tableTo": "forms",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "form_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "fk_submission_user": {
+          "name": "fk_submission_user",
+          "tableFrom": "submissions",
+          "tableTo": "users",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "chk_submission_status": {
+          "name": "chk_submission_status",
+          "value": "(submission_status)::text = ANY ((ARRAY['submitted'::character varying, 'processing'::character varying, 'completed'::character varying, 'failed'::character varying])::text[])"
+        }
+      },
+      "policies": {},
+      "isRLSEnabled": false
+    },
+    "public.answers": {
+      "name": "answers",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "submission_id": {
+          "name": "submission_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "field_id": {
+          "name": "field_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "answer_text": {
+          "name": "answer_text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "answer_option_id": {
+          "name": "answer_option_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "CURRENT_TIMESTAMP"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      },
+      "indexes": {
+        "idx_answers_answer_option_id": {
+          "name": "idx_answers_answer_option_id",
+          "columns": [
+            {
+              "expression": "answer_option_id",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "int4_ops",
+              "isExpression": false
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_answers_field_id": {
+          "name": "idx_answers_field_id",
+          "columns": [
+            {
+              "expression": "field_id",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "int4_ops",
+              "isExpression": false
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_answers_submission_id": {
+          "name": "idx_answers_submission_id",
+          "columns": [
+            {
+              "expression": "submission_id",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "int4_ops",
+              "isExpression": false
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "fk_answer_submission": {
+          "name": "fk_answer_submission",
+          "tableFrom": "answers",
+          "tableTo": "submissions",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "submission_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "fk_answer_field": {
+          "name": "fk_answer_field",
+          "tableFrom": "answers",
+          "tableTo": "form_fields",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "field_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "fk_answer_option": {
+          "name": "fk_answer_option",
+          "tableFrom": "answers",
+          "tableTo": "field_options",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "answer_option_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
       "checkConstraints": {},
+      "policies": {},
+      "isRLSEnabled": false
+    },
+    "public.points": {
+      "name": "points",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "answer_id": {
+          "name": "answer_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "canonical_topic_id": {
+          "name": "canonical_topic_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "point_text": {
+          "name": "point_text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "embedding": {
+          "name": "embedding",
+          "type": "vector(384)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sentiment_label": {
+          "name": "sentiment_label",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_severe": {
+          "name": "is_severe",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "default": false
+        },
+        "assignment_confidence": {
+          "name": "assignment_confidence",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "processing_status": {
+          "name": "processing_status",
+          "type": "varchar(30)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "CURRENT_TIMESTAMP"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      },
+      "indexes": {
+        "idx_points_answer_id": {
+          "name": "idx_points_answer_id",
+          "columns": [
+            {
+              "expression": "answer_id",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "int4_ops",
+              "isExpression": false
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_points_canonical_topic_id": {
+          "name": "idx_points_canonical_topic_id",
+          "columns": [
+            {
+              "expression": "canonical_topic_id",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "int4_ops",
+              "isExpression": false
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_points_embedding_hnsw": {
+          "name": "idx_points_embedding_hnsw",
+          "columns": [
+            {
+              "expression": "embedding",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "vector_cosine_ops",
+              "isExpression": false
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "hnsw",
+          "with": {}
+        },
+        "idx_points_processing_status": {
+          "name": "idx_points_processing_status",
+          "columns": [
+            {
+              "expression": "processing_status",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "text_ops",
+              "isExpression": false
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "fk_point_answer": {
+          "name": "fk_point_answer",
+          "tableFrom": "points",
+          "tableTo": "answers",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "answer_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "fk_point_topic": {
+          "name": "fk_point_topic",
+          "tableFrom": "points",
+          "tableTo": "canonical_topics",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "canonical_topic_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "chk_sentiment": {
+          "name": "chk_sentiment",
+          "value": "(sentiment_label)::text = ANY ((ARRAY['positive'::character varying, 'neutral'::character varying, 'negative'::character varying])::text[])"
+        },
+        "chk_processing": {
+          "name": "chk_processing",
+          "value": "(processing_status)::text = ANY ((ARRAY['pending'::character varying, 'assigned'::character varying, 'unknown'::character varying, 'clustered'::character varying])::text[])"
+        }
+      },
       "policies": {},
       "isRLSEnabled": false
     },
@@ -671,6 +666,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "parent_folder_id": {
+          "name": "parent_folder_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
         "folder_name": {
           "name": "folder_name",
           "type": "varchar(255)",
@@ -683,14 +684,92 @@
           "primaryKey": false,
           "notNull": false
         },
+        "sort_order": {
+          "name": "sort_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp",
           "primaryKey": false,
-          "notNull": false
+          "notNull": false,
+          "default": "CURRENT_TIMESTAMP"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "CURRENT_TIMESTAMP"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "idx_folders_admin_id": {
+          "name": "idx_folders_admin_id",
+          "columns": [
+            {
+              "expression": "admin_id",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "int4_ops",
+              "isExpression": false
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_folders_parent_folder_id": {
+          "name": "idx_folders_parent_folder_id",
+          "columns": [
+            {
+              "expression": "parent_folder_id",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "int4_ops",
+              "isExpression": false
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "uq_folder_sibling_name": {
+          "name": "uq_folder_sibling_name",
+          "columns": [
+            {
+              "expression": "admin_id",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "text_ops",
+              "isExpression": true
+            },
+            {
+              "expression": "COALESCE(parent_folder_id, 0)",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "int4_ops",
+              "isExpression": true
+            },
+            {
+              "expression": "lower((folder_name)::text)",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "int4_ops",
+              "isExpression": true
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "fk_folder_admin": {
           "name": "fk_folder_admin",
@@ -705,11 +784,259 @@
           ],
           "onDelete": "cascade",
           "onUpdate": "no action"
+        },
+        "fk_folder_parent": {
+          "name": "fk_folder_parent",
+          "tableFrom": "folders",
+          "tableTo": "folders",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "parent_folder_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {},
+      "policies": {},
+      "isRLSEnabled": false
+    },
+    "public.ai_model_runs": {
+      "name": "ai_model_runs",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "form_id": {
+          "name": "form_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "model_name": {
+          "name": "model_name",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "model_version": {
+          "name": "model_version",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "embedding_model": {
+          "name": "embedding_model",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "clustering_algorithm": {
+          "name": "clustering_algorithm",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "parameters": {
+          "name": "parameters",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "error": {
+          "name": "error",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "started_at": {
+          "name": "started_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "completed_at": {
+          "name": "completed_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "CURRENT_TIMESTAMP"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "fk_model_run_form": {
+          "name": "fk_model_run_form",
+          "tableFrom": "ai_model_runs",
+          "tableTo": "forms",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "form_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {},
+      "policies": {},
+      "isRLSEnabled": false
+    },
+    "public.form_fields": {
+      "name": "form_fields",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "form_id": {
+          "name": "form_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "field_label": {
+          "name": "field_label",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "field_type": {
+          "name": "field_type",
+          "type": "varchar(30)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "section": {
+          "name": "section",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'feedback'"
+        },
+        "analyze_with_ai": {
+          "name": "analyze_with_ai",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "allow_other": {
+          "name": "allow_other",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "is_required": {
+          "name": "is_required",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "default": false
+        },
+        "field_order": {
+          "name": "field_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "CURRENT_TIMESTAMP"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      },
+      "indexes": {
+        "idx_form_fields_form_id": {
+          "name": "idx_form_fields_form_id",
+          "columns": [
+            {
+              "expression": "form_id",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "int4_ops",
+              "isExpression": false
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "fk_field_form": {
+          "name": "fk_field_form",
+          "tableFrom": "form_fields",
+          "tableTo": "forms",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "form_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "chk_field_type": {
+          "name": "chk_field_type",
+          "value": "(field_type)::text = ANY ((ARRAY['text'::character varying, 'textarea'::character varying, 'checkbox'::character varying, 'radio'::character varying])::text[])"
+        },
+        "chk_field_section": {
+          "name": "chk_field_section",
+          "value": "(section)::text = ANY ((ARRAY['demographic'::character varying, 'feedback'::character varying])::text[])"
+        }
+      },
       "policies": {},
       "isRLSEnabled": false
     },
@@ -735,6 +1062,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "organization_id": {
+          "name": "organization_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
         "form_title": {
           "name": "form_title",
           "type": "varchar(255)",
@@ -747,9 +1080,42 @@
           "primaryKey": false,
           "notNull": false
         },
+        "cover_image_url": {
+          "name": "cover_image_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "status": {
           "name": "status",
           "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'draft'"
+        },
+        "accepting_responses": {
+          "name": "accepting_responses",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "published_at": {
+          "name": "published_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "public_token": {
+          "name": "public_token",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "slug": {
+          "name": "slug",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": false
         },
@@ -757,25 +1123,29 @@
           "name": "access_type",
           "type": "varchar(30)",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true,
+          "default": "'organization'"
         },
         "record_name": {
           "name": "record_name",
           "type": "boolean",
           "primaryKey": false,
-          "notNull": false
+          "notNull": false,
+          "default": false
         },
         "one_response_per_person": {
           "name": "one_response_per_person",
           "type": "boolean",
           "primaryKey": false,
-          "notNull": false
+          "notNull": false,
+          "default": false
         },
-        "organization_id": {
-          "name": "organization_id",
+        "sort_order": {
+          "name": "sort_order",
           "type": "integer",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true,
+          "default": 0
         },
         "start_date": {
           "name": "start_date",
@@ -793,10 +1163,83 @@
           "name": "created_at",
           "type": "timestamp",
           "primaryKey": false,
-          "notNull": false
+          "notNull": false,
+          "default": "CURRENT_TIMESTAMP"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "CURRENT_TIMESTAMP"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "idx_forms_admin_id": {
+          "name": "idx_forms_admin_id",
+          "columns": [
+            {
+              "expression": "admin_id",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "int4_ops",
+              "isExpression": false
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_forms_folder_id": {
+          "name": "idx_forms_folder_id",
+          "columns": [
+            {
+              "expression": "folder_id",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "int4_ops",
+              "isExpression": false
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_forms_organization_id": {
+          "name": "idx_forms_organization_id",
+          "columns": [
+            {
+              "expression": "organization_id",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "int4_ops",
+              "isExpression": false
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_forms_status": {
+          "name": "idx_forms_status",
+          "columns": [
+            {
+              "expression": "status",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "text_ops",
+              "isExpression": false
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "fk_form_admin": {
           "name": "fk_form_admin",
@@ -843,7 +1286,16 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "chk_form_status": {
+          "name": "chk_form_status",
+          "value": "(status)::text = ANY ((ARRAY['draft'::character varying, 'active'::character varying, 'closed'::character varying, 'archived'::character varying])::text[])"
+        },
+        "chk_access_type": {
+          "name": "chk_access_type",
+          "value": "(access_type)::text = ANY ((ARRAY['public'::character varying, 'organization'::character varying, 'specific'::character varying])::text[])"
+        }
+      },
       "policies": {},
       "isRLSEnabled": false
     },
@@ -873,10 +1325,35 @@
           "name": "created_at",
           "type": "timestamp",
           "primaryKey": false,
-          "notNull": false
+          "notNull": false,
+          "default": "CURRENT_TIMESTAMP"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "CURRENT_TIMESTAMP"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "idx_form_allowed_users_user_id": {
+          "name": "idx_form_allowed_users_user_id",
+          "columns": [
+            {
+              "expression": "user_id",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "int4_ops",
+              "isExpression": false
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "fk_allowed_form": {
           "name": "fk_allowed_form",
@@ -899,76 +1376,6 @@
           "schemaTo": "public",
           "columnsFrom": [
             "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {},
-      "policies": {},
-      "isRLSEnabled": false
-    },
-    "public.form_fields": {
-      "name": "form_fields",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "serial",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "form_id": {
-          "name": "form_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "field_label": {
-          "name": "field_label",
-          "type": "varchar(255)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "field_type": {
-          "name": "field_type",
-          "type": "varchar(30)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "is_required": {
-          "name": "is_required",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "field_order": {
-          "name": "field_order",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "fk_field_form": {
-          "name": "fk_field_form",
-          "tableFrom": "form_fields",
-          "tableTo": "forms",
-          "schemaTo": "public",
-          "columnsFrom": [
-            "form_id"
           ],
           "columnsTo": [
             "id"
@@ -1021,10 +1428,35 @@
           "name": "created_at",
           "type": "timestamp",
           "primaryKey": false,
-          "notNull": false
+          "notNull": false,
+          "default": "CURRENT_TIMESTAMP"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "CURRENT_TIMESTAMP"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "idx_field_options_field_id": {
+          "name": "idx_field_options_field_id",
+          "columns": [
+            {
+              "expression": "field_id",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "int4_ops",
+              "isExpression": false
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "fk_option_field": {
           "name": "fk_option_field",
@@ -1047,8 +1479,8 @@
       "policies": {},
       "isRLSEnabled": false
     },
-    "public.submissions": {
-      "name": "submissions",
+    "public.canonical_topics": {
+      "name": "canonical_topics",
       "schema": "",
       "columns": {
         "id": {
@@ -1061,23 +1493,53 @@
           "name": "form_id",
           "type": "integer",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
-        "user_id": {
-          "name": "user_id",
+        "field_id": {
+          "name": "field_id",
           "type": "integer",
           "primaryKey": false,
           "notNull": false
         },
-        "anonymous_code": {
-          "name": "anonymous_code",
-          "type": "varchar(100)",
+        "merged_into_id": {
+          "name": "merged_into_id",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false
         },
-        "submission_status": {
-          "name": "submission_status",
-          "type": "varchar(30)",
+        "canonical_name": {
+          "name": "canonical_name",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "canonical_summary": {
+          "name": "canonical_summary",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "representative_keywords": {
+          "name": "representative_keywords",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "centroid_vector": {
+          "name": "centroid_vector",
+          "type": "vector(384)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "topic_size": {
+          "name": "topic_size",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "varchar(20)",
           "primaryKey": false,
           "notNull": false
         },
@@ -1085,14 +1547,62 @@
           "name": "created_at",
           "type": "timestamp",
           "primaryKey": false,
-          "notNull": false
+          "notNull": false,
+          "default": "CURRENT_TIMESTAMP"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "CURRENT_TIMESTAMP"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "idx_canonical_topics_centroid_hnsw": {
+          "name": "idx_canonical_topics_centroid_hnsw",
+          "columns": [
+            {
+              "expression": "centroid_vector",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "vector_cosine_ops",
+              "isExpression": false
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "hnsw",
+          "with": {}
+        },
+        "idx_canonical_topics_form_status": {
+          "name": "idx_canonical_topics_form_status",
+          "columns": [
+            {
+              "expression": "form_id",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "int4_ops",
+              "isExpression": false
+            },
+            {
+              "expression": "status",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "int4_ops",
+              "isExpression": false
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
-        "fk_submission_form": {
-          "name": "fk_submission_form",
-          "tableFrom": "submissions",
+        "fk_topic_form": {
+          "name": "fk_topic_form",
+          "tableFrom": "canonical_topics",
           "tableTo": "forms",
           "schemaTo": "public",
           "columnsFrom": [
@@ -1104,13 +1614,27 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "fk_submission_user": {
-          "name": "fk_submission_user",
-          "tableFrom": "submissions",
-          "tableTo": "users",
+        "fk_topic_field": {
+          "name": "fk_topic_field",
+          "tableFrom": "canonical_topics",
+          "tableTo": "form_fields",
           "schemaTo": "public",
           "columnsFrom": [
-            "user_id"
+            "field_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "fk_topic_merged_into": {
+          "name": "fk_topic_merged_into",
+          "tableFrom": "canonical_topics",
+          "tableTo": "canonical_topics",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "merged_into_id"
           ],
           "columnsTo": [
             "id"
@@ -1121,7 +1645,12 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "chk_topic_status": {
+          "name": "chk_topic_status",
+          "value": "(status)::text = ANY ((ARRAY['active'::character varying, 'merged'::character varying, 'archived'::character varying])::text[])"
+        }
+      },
       "policies": {},
       "isRLSEnabled": false
     }

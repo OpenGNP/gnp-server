@@ -1,6 +1,6 @@
-import { desc, eq } from "drizzle-orm";
+import { count, desc, eq, sql } from "drizzle-orm";
 
-import { canonicalTopics, db, points, topicTrends } from "../db/client";
+import { canonicalTopics, db, points } from "../db/client";
 import { notFound } from "../utils/errors";
 import type { CreateTopicInput } from "../validators/topicValidator";
 
@@ -14,11 +14,22 @@ export const topicService = {
 
     if (!topic) throw notFound("Topic not found");
 
+    // Weekly counts computed from this topic's points.
+    const periodStart = sql<string>`date_trunc('week', ${points.createdAt})`;
     const trends = await db
-      .select()
-      .from(topicTrends)
-      .where(eq(topicTrends.canonicalTopicId, id))
-      .orderBy(topicTrends.periodStart);
+      .select({
+        periodStart: sql<string>`${periodStart}`.as("period_start"),
+        periodEnd: sql<string>`${periodStart} + interval '7 days'`.as("period_end"),
+        feedbackCount: count(),
+        positiveCount: sql<number>`count(*) filter (where ${points.sentimentLabel} = 'positive')`.mapWith(Number),
+        neutralCount: sql<number>`count(*) filter (where ${points.sentimentLabel} = 'neutral')`.mapWith(Number),
+        negativeCount: sql<number>`count(*) filter (where ${points.sentimentLabel} = 'negative')`.mapWith(Number),
+        severeCount: sql<number>`count(*) filter (where ${points.isSevere})`.mapWith(Number),
+      })
+      .from(points)
+      .where(eq(points.canonicalTopicId, id))
+      .groupBy(periodStart)
+      .orderBy(periodStart);
 
     const samplePoints = await db
       .select({

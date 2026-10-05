@@ -1,4 +1,4 @@
-import { and, count, countDistinct, desc, eq, gte, inArray, isNotNull, lte, max, min } from "drizzle-orm";
+import { and, count, countDistinct, desc, eq, gte, inArray, isNotNull, lte, max, min, sql } from "drizzle-orm";
 
 import {
   answers,
@@ -9,7 +9,6 @@ import {
   forms,
   points,
   submissions,
-  topicTrends,
 } from "../db/client";
 import { forbidden, notFound } from "../utils/errors";
 
@@ -302,23 +301,26 @@ export const analyticsService = {
     };
   },
 
+  /** Weekly per-topic feedback counts, computed from `points` (newest week first). */
   async trends(limit = 20) {
+    const periodStart = sql<string>`date_trunc('week', ${points.createdAt})`;
+
     return db
       .select({
-        id: topicTrends.id,
-        topicId: topicTrends.canonicalTopicId,
+        topicId: points.canonicalTopicId,
         topicName: canonicalTopics.canonicalName,
-        periodStart: topicTrends.periodStart,
-        periodEnd: topicTrends.periodEnd,
-        feedbackCount: topicTrends.feedbackCount,
-        positiveCount: topicTrends.positiveCount,
-        neutralCount: topicTrends.neutralCount,
-        negativeCount: topicTrends.negativeCount,
-        severeCount: topicTrends.severeCount,
+        periodStart: sql<string>`${periodStart}`.as("period_start"),
+        periodEnd: sql<string>`${periodStart} + interval '7 days'`.as("period_end"),
+        feedbackCount: count(),
+        positiveCount: sql<number>`count(*) filter (where ${points.sentimentLabel} = 'positive')`.mapWith(Number),
+        neutralCount: sql<number>`count(*) filter (where ${points.sentimentLabel} = 'neutral')`.mapWith(Number),
+        negativeCount: sql<number>`count(*) filter (where ${points.sentimentLabel} = 'negative')`.mapWith(Number),
+        severeCount: sql<number>`count(*) filter (where ${points.isSevere})`.mapWith(Number),
       })
-      .from(topicTrends)
-      .innerJoin(canonicalTopics, eq(topicTrends.canonicalTopicId, canonicalTopics.id))
-      .orderBy(desc(topicTrends.periodEnd))
+      .from(points)
+      .innerJoin(canonicalTopics, eq(points.canonicalTopicId, canonicalTopics.id))
+      .groupBy(points.canonicalTopicId, canonicalTopics.canonicalName, periodStart)
+      .orderBy(desc(periodStart), points.canonicalTopicId)
       .limit(limit);
   },
 
