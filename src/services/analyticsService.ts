@@ -624,8 +624,8 @@ export const analyticsService = {
     }
 
     // Demographic filter: keep only submissions whose answer to every selected
-    // question is one of the chosen values. `demographicFilters` is built from the
-    // unfiltered answers so the options don't vanish as the user narrows down.
+    // question is one of the chosen values. `demographicFilters` (below) comes from the
+    // form definition, so the options don't vanish as the user narrows down.
     const filterEntries = Object.entries(opts.demo ?? {}).filter(([, values]) => values.length > 0);
     const matchesDemo = (submissionId: number) =>
       filterEntries.every(([label, values]) =>
@@ -633,20 +633,35 @@ export const analyticsService = {
           (entry) => entry.label === label && values.includes(entry.value || "Unspecified"),
         ),
       );
+    // Every demographic question and answer option the form has in the database —
+    // current and soft-deleted — not just the ones respondents happened to pick. Groups
+    // are keyed by label (that's what the filter matches on), so a removed question and
+    // its replacement of the same name share one group.
+    const demoFieldRows = await db
+      .select({
+        fieldOrder: formFields.fieldOrder,
+        label: formFields.fieldLabel,
+        optionLabel: fieldOptions.optionLabel,
+        optionOrder: fieldOptions.optionOrder,
+      })
+      .from(formFields)
+      .leftJoin(fieldOptions, eq(fieldOptions.fieldId, formFields.id))
+      .where(
+        and(
+          eq(formFields.formId, formId),
+          eq(formFields.section, "demographic"),
+          eq(formFields.fieldType, "radio"),
+        ),
+      )
+      .orderBy(formFields.fieldOrder, fieldOptions.optionOrder);
     const demographicFilters = (() => {
-      const byField = new Map<number, { order: number; label: string; options: Set<string> }>();
-      for (const row of demoRows) {
-        const group = byField.get(row.fieldId) ?? {
-          order: row.order ?? 0,
-          label: row.label ?? "Question",
-          options: new Set<string>(),
-        };
-        group.options.add(row.option || "Unspecified");
-        byField.set(row.fieldId, group);
+      const byLabel = new Map<string, Set<string>>();
+      for (const row of demoFieldRows) {
+        const options = byLabel.get(row.label ?? "Question") ?? new Set<string>();
+        if (row.optionLabel) options.add(row.optionLabel);
+        byLabel.set(row.label ?? "Question", options);
       }
-      return [...byField.values()]
-        .sort((a, b) => a.order - b.order)
-        .map((group) => ({ label: group.label, options: [...group.options].sort() }));
+      return [...byLabel.entries()].map(([label, options]) => ({ label, options: [...options] }));
     })();
 
     if (filterEntries.length > 0) {
