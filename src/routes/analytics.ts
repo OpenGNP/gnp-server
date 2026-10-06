@@ -47,6 +47,7 @@ export const analyticsRoutes = new Elysia({ prefix: "/analytics" })
         from: typeof query.from === "string" ? query.from : undefined,
         to: typeof query.to === "string" ? query.to : undefined,
         demo: typeof query.demo === "string" ? query.demo : undefined,
+        tz: typeof query.tz === "string" ? query.tz : undefined,
       });
       return successResponse("Form theme analytics loaded successfully", data);
     },
@@ -56,7 +57,8 @@ export const analyticsRoutes = new Elysia({ prefix: "/analytics" })
         security,
         summary: "Topic / sentiment analysis for one form (Themes tab)",
         description: "Query: from / to (ISO dates) — defaults to the span of the form's analysed feedback. " +
-          "demo (JSON object {question label: [answers]}) narrows to respondents matching every selected question.",
+          "demo (JSON object {question label: [answers]}) narrows to respondents matching every selected question. " +
+          "tz (IANA zone, e.g. Asia/Bangkok) sets where days start for buckets and labels; default UTC.",
       },
     },
   )
@@ -71,6 +73,7 @@ export const analyticsRoutes = new Elysia({ prefix: "/analytics" })
         bucket: typeof query.bucket === "string" ? query.bucket : undefined,
         rank: typeof query.rank === "string" ? query.rank : undefined,
         topics: typeof query.topics === "string" ? query.topics : undefined,
+        tz: typeof query.tz === "string" ? query.tz : undefined,
       });
       return successResponse("Form trend analytics loaded successfully", data);
     },
@@ -82,7 +85,7 @@ export const analyticsRoutes = new Elysia({ prefix: "/analytics" })
         description:
           "Query: from / to (ISO dates), bucket (day | week | month | year), " +
           "rank (movers | mentioned | severe — orders availableTopics + auto-picks lines), " +
-          "topics (comma-separated topic ids to chart, max 8). " +
+          "topics (comma-separated topic ids to chart, max 8), tz (IANA zone — where days start; default UTC). " +
           "Returns a real time series plus availableTopics for the picker.",
       },
     },
