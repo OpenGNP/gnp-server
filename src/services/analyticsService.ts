@@ -11,6 +11,7 @@ import {
   submissions,
 } from "../db/client";
 import { forbidden, notFound } from "../utils/errors";
+import { parseDbTimestamp } from "../utils/timestamp";
 
 const SENTIMENT_LABELS = ["positive", "neutral", "negative"] as const;
 
@@ -155,9 +156,8 @@ export type FormTrend = {
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-/** Zone-less DB timestamp → epoch ms, read as UTC (columns are `timestamp` without tz). */
-const parseTs = (value: string): number =>
-  Date.parse(/Z$|[+-]\d\d(:?\d\d)?$/.test(value) ? value : `${value.replace(" ", "T")}Z`);
+/** DB `timestamptz` string → epoch ms (see parseDbTimestamp). */
+const parseTs = parseDbTimestamp;
 
 /** Short UTC date for range labels, e.g. "8 Jun 2026". */
 const fmtDateUTC = (t: number): string =>
@@ -416,6 +416,7 @@ export const analyticsService = {
         type: formFields.fieldType,
         section: formFields.section,
         order: formFields.fieldOrder,
+        deletedAt: formFields.deletedAt,
       })
       .from(formFields)
       .where(eq(formFields.formId, formId))
@@ -427,6 +428,7 @@ export const analyticsService = {
         fieldId: fieldOptions.fieldId,
         label: fieldOptions.optionLabel,
         order: fieldOptions.optionOrder,
+        deletedAt: fieldOptions.deletedAt,
       })
       .from(fieldOptions)
       .innerJoin(formFields, eq(fieldOptions.fieldId, formFields.id))
@@ -474,14 +476,19 @@ export const analyticsService = {
 
     const toBreakdown = (field: (typeof fields)[number]): FieldBreakdown | null => {
       const id = String(field.id);
-      const title = field.label ?? "Untitled question";
+      // Questions/options an admin removed after responses came in are kept (soft-deleted)
+      // so their collected answers still show — flagged, and dropped when nobody answered.
+      if (field.deletedAt && (fieldRespondents.get(field.id) ?? 0) === 0) return null;
+      const title = `${field.label ?? "Untitled question"}${field.deletedAt ? " (removed)" : ""}`;
 
       if (field.type === "radio" || field.type === "checkbox") {
-        const opts = (optionsByField.get(field.id) ?? []).map((option) => ({
-          id: String(option.id),
-          label: option.label ?? "",
-          value: optionCounts.get(option.id) ?? 0,
-        }));
+        const opts = (optionsByField.get(field.id) ?? [])
+          .filter((option) => !option.deletedAt || (optionCounts.get(option.id) ?? 0) > 0)
+          .map((option) => ({
+            id: String(option.id),
+            label: `${option.label ?? ""}${option.deletedAt ? " (removed)" : ""}`,
+            value: optionCounts.get(option.id) ?? 0,
+          }));
 
         return field.type === "checkbox"
           ? { kind: "multi-choice", id, title, totalRespondents: fieldRespondents.get(field.id) ?? 0, options: opts }
