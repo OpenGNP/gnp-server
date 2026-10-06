@@ -11,6 +11,7 @@ import { topicRoutes } from "./routes/topic";
 import { analyticsRoutes } from "./routes/analytics";
 
 import { databaseConfig } from "./config/database";
+import { checkDatabase } from "./db/client";
 import { env } from "./config/env";
 import { errorMiddleware } from "./middleware/errorMiddleware";
 import { loggerMiddleware } from "./middleware/loggerMiddleware";
@@ -24,11 +25,17 @@ const app = new Elysia()
   .get("/", () => "Backend is running", { detail: { tags: ["System"], summary: "Liveness check" } })
   .get(
     "/api/health",
-    () => {
+    async ({ set }) => {
+      const dbStatus = databaseConfig.isConfigured ? await checkDatabase() : { connected: false };
+      if (!dbStatus.connected) set.status = 503;
       return {
-        status: "ok",
+        status: dbStatus.connected ? "ok" : "degraded",
         service: "gnp-backend",
-        database: databaseConfig.isConfigured ? "configured" : "not configured",
+        database: !databaseConfig.isConfigured
+          ? "not configured"
+          : dbStatus.connected
+            ? "connected"
+            : "unreachable",
       };
     },
     { detail: { tags: ["System"], summary: "Health check" } },
@@ -48,3 +55,8 @@ const app = new Elysia()
 
 console.log(`Server running at http://localhost:${app.server?.port}`);
 console.log(`API docs available at http://localhost:${app.server?.port}/docs`);
+
+const dbStatus = await checkDatabase();
+console.log(
+  dbStatus.connected ? "Database connected" : `Database connection FAILED: ${dbStatus.error}`,
+);
