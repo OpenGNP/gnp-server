@@ -506,16 +506,9 @@ export const analyticsService = {
     );
 
     const windowSubmissions = await db
-      .select({ id: submissions.id })
+      .select({ id: submissions.id, createdAt: submissions.createdAt })
       .from(submissions)
       .where(and(eq(submissions.formId, formId), inWindow));
-
-    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-    const [recent] = await db
-      .select({ value: count() })
-      .from(submissions)
-      .where(and(eq(submissions.formId, formId), gte(submissions.createdAt, weekAgo)));
-    const recentResponders = recent?.value ?? 0;
 
     // Every analysed point for this form in the window, with its source answer text + submission.
     const pointRows = await db
@@ -617,7 +610,19 @@ export const analyticsService = {
         if (!matchesDemo(pointRows[i]!.submissionId)) pointRows.splice(i, 1);
       }
     }
-    const totalResponders = windowSubmissions.filter((row) => matchesDemo(row.id)).length;
+    const matchingSubmissions = windowSubmissions.filter((row) => matchesDemo(row.id));
+    const totalResponders = matchingSubmissions.length;
+
+    // Responders (same date + demographic filters) in the last 7 days of the selected
+    // window. Called "this week" when the window runs up to now; otherwise it's the
+    // window's final week, so the label says so rather than implying "now".
+    const weekStart = Math.max(from, to - 7 * DAY_MS);
+    const recentResponders = matchingSubmissions.filter((row) => {
+      const t = row.createdAt ? parseTs(row.createdAt) : NaN;
+      return t >= weekStart && t <= to;
+    }).length;
+    const windowEndsNow = Date.now() - to < DAY_MS;
+    const responderDeltaLabel = `+${recentResponders} ${windowEndsNow ? "this week" : "in final week"}`;
 
     const overall: Record<Sentiment, number> = { negative: 0, neutral: 0, positive: 0 };
     for (const row of pointRows) {
@@ -725,7 +730,8 @@ export const analyticsService = {
       /** Analysed mentions across ALL time — lets the UI tell "none yet" from "none in range". */
       totalMentions,
       totalResponders,
-      responderDeltaLabel: `+${recentResponders} this week`,
+      responderDelta: recentResponders,
+      responderDeltaLabel,
       demographicFilters,
       sentiment,
       highIntenseTopics: topics.filter((topic) => topic.isHighIntensity),
