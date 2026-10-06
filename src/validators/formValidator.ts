@@ -30,6 +30,9 @@ const fieldOptionSchema = z.object({
 });
 
 const formFieldSchema = z.object({
+  // Present when the caller is editing an existing question; omitted for new ones.
+  // Only meaningful on `PATCH /forms/:id` — see formService.update.
+  id: z.number().int().positive().optional(),
   fieldLabel: z.string().trim().min(1).max(255),
   fieldType: formFieldTypeEnum,
   section: formSectionEnum.default("feedback"),
@@ -61,9 +64,9 @@ export const createFormSchema = z.object({
 // never touched and clobber existing values on PATCH.
 //
 // `fields`, when present, REPLACES the form's entire field list (and their
-// options) in one transaction — see formService.update. It is refused when the
-// form already has submissions so an edit to unrelated settings can't cascade-
-// delete answers.
+// options) in one transaction — see formService.update. When the form already has
+// submissions it is applied as an in-place diff instead (fields matched by `id`,
+// options by label; removed ones are soft-deleted) so collected answers survive.
 //
 // `coverImageUrl` is deliberately NOT settable here — it's an internal MinIO
 // object key, not something a client should ever write directly. It's managed

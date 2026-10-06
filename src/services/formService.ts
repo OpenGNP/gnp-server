@@ -5,6 +5,7 @@ import { contentTypeForKey, extensionForMimeType, getObjectBuffer, putObject, re
 import type { CurrentUser } from "../middleware/authMiddleware";
 import { badRequest, forbidden, notFound, unauthorized } from "../utils/errors";
 import { anonymousIdentityCode } from "../utils/helper";
+import { parseDbTimestamp } from "../utils/timestamp";
 import type {
   CreateFieldOptionInput,
   CreateFormFieldInput,
@@ -20,13 +21,10 @@ type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 const nowIso = () => new Date().toISOString();
 
 /**
- * `forms.start_date` / `end_date` are `timestamp` (no time zone) columns and come back
- * zone-less ("2026-06-08 02:55:00"). Writes go in as UTC (`dateStringSchema` →
- * `.toISOString()`), so parse them back as UTC — `Date.parse` on a zone-less string
- * uses the process's local zone, which need not be UTC.
+ * `forms.start_date` / `end_date` are `timestamptz` columns and come back as strings
+ * like "2026-06-08 09:55:00+07" — see parseDbTimestamp.
  */
-const parseStoredTimestamp = (value: string): number =>
-  Date.parse(/Z$|[+-]\d\d(:?\d\d)?$/.test(value) ? value : `${value.replace(" ", "T")}Z`);
+const parseStoredTimestamp = parseDbTimestamp;
 
 /** Insert a list of fields (with their options) for a form, in the given order. */
 async function insertFields(tx: Tx, formId: number, fields: FormFieldInput[]) {
@@ -58,12 +56,128 @@ async function insertFields(tx: Tx, formId: number, fields: FormFieldInput[]) {
   }
 }
 
+const COMPARABLE_TEXT_TYPES = new Set(["text", "textarea"]);
+
+/**
+ * Edits a form's questions IN PLACE once it has responses, so the collected answers
+ * (which reference field/option ids, ON DELETE CASCADE) are never touched.
+ *   - Payload fields carrying an `id` update that question; the rest are inserted.
+ *   - Existing questions missing from the payload are soft-deleted (`deleted_at`).
+ *   - Options are matched by label within their question: unmatched incoming ones are
+ *     inserted, unmatched existing ones soft-deleted, and a label that matches a
+ *     previously soft-deleted option brings it back. (So renaming an option is a
+ *     delete + add — old answers keep the old wording.)
+ *   - A question's type/section can't change once answers exist (text ↔ textarea is
+ *     the one harmless exception).
+ */
+async function applyFieldEdits(tx: Tx, formId: number, fields: FormFieldInput[]) {
+  const now = nowIso();
+  const existing = await tx.select().from(formFields).where(eq(formFields.formId, formId));
+  const existingById = new Map(existing.map((field) => [field.id, field]));
+  const keptIds = new Set<number>();
+
+  for (const [index, field] of fields.entries()) {
+    const fieldOrder = field.fieldOrder ?? index + 1;
+    const current = field.id === undefined ? undefined : existingById.get(field.id);
+    if (field.id !== undefined && !current) {
+      throw badRequest(`Field ${field.id} does not belong to this form`);
+    }
+
+    if (!current) {
+      await insertFields(tx, formId, [{ ...field, fieldOrder }]);
+      continue;
+    }
+
+    keptIds.add(current.id);
+    const sameType =
+      current.fieldType === field.fieldType ||
+      (COMPARABLE_TEXT_TYPES.has(current.fieldType ?? "") && COMPARABLE_TEXT_TYPES.has(field.fieldType));
+    if (!sameType || current.section !== field.section) {
+      throw badRequest(
+        `"${current.fieldLabel ?? "This question"}" already has responses, so its type or section can't be changed. Add a new question instead.`,
+      );
+    }
+
+    await tx
+      .update(formFields)
+      .set({
+        fieldLabel: field.fieldLabel,
+        fieldType: field.fieldType,
+        isRequired: field.isRequired,
+        analyzeWithAi: field.analyzeWithAi,
+        allowOther: field.allowOther,
+        fieldOrder,
+        deletedAt: null,
+        updatedAt: now,
+      })
+      .where(eq(formFields.id, current.id));
+
+    if (field.fieldType !== "radio" && field.fieldType !== "checkbox") continue;
+
+    const existingOptions = await tx.select().from(fieldOptions).where(eq(fieldOptions.fieldId, current.id));
+    const optionByLabel = new Map<string, (typeof existingOptions)[number]>();
+    // Prefer a live option over a soft-deleted one when labels collide.
+    for (const option of existingOptions) {
+      const key = (option.optionLabel ?? "").trim();
+      if (!optionByLabel.has(key) || !option.deletedAt) optionByLabel.set(key, option);
+    }
+
+    const keptOptionIds = new Set<number>();
+    for (const [optionIndex, option] of (field.options ?? []).entries()) {
+      const optionOrder = option.optionOrder ?? optionIndex + 1;
+      const match = optionByLabel.get(option.optionLabel.trim());
+      if (match && !keptOptionIds.has(match.id)) {
+        keptOptionIds.add(match.id);
+        await tx
+          .update(fieldOptions)
+          .set({ optionOrder, deletedAt: null, updatedAt: now })
+          .where(eq(fieldOptions.id, match.id));
+      } else {
+        await tx.insert(fieldOptions).values({
+          fieldId: current.id,
+          optionLabel: option.optionLabel,
+          optionValue: option.optionValue,
+          optionOrder,
+        });
+      }
+    }
+
+    const removedOptionIds = existingOptions
+      .filter((option) => !keptOptionIds.has(option.id) && !option.deletedAt)
+      .map((option) => option.id);
+    if (removedOptionIds.length > 0) {
+      await tx
+        .update(fieldOptions)
+        .set({ deletedAt: now, updatedAt: now })
+        .where(inArray(fieldOptions.id, removedOptionIds));
+    }
+  }
+
+  const removedFieldIds = existing
+    .filter((field) => !keptIds.has(field.id) && !field.deletedAt)
+    .map((field) => field.id);
+  if (removedFieldIds.length > 0) {
+    await tx
+      .update(formFields)
+      .set({ deletedAt: now, updatedAt: now })
+      .where(inArray(formFields.id, removedFieldIds));
+  }
+}
+
 /**
  * Stamp `forms.updated_at` so "last updated" reflects edits to the form's fields
  * and options, not just direct changes to the form row.
  */
 async function touchForm(formId: number) {
   await db.update(forms).set({ updatedAt: nowIso() }).where(eq(forms.id, formId));
+}
+
+async function hasSubmissions(formId: number) {
+  const [row] = await db
+    .select({ value: count(submissions.id) })
+    .from(submissions)
+    .where(eq(submissions.formId, formId));
+  return (row?.value ?? 0) > 0;
 }
 
 async function getOwnedForm(id: number, adminId: number) {
@@ -152,14 +266,14 @@ async function assertFolderOwnership(folderId: number, adminId: number) {
 async function getFieldOrThrow(fieldId: number, formId: number) {
   const [field] = await db.select().from(formFields).where(eq(formFields.id, fieldId)).limit(1);
 
-  if (!field || field.formId !== formId) throw notFound("Field not found");
+  if (!field || field.formId !== formId || field.deletedAt) throw notFound("Field not found");
   return field;
 }
 
 async function getOptionOrThrow(optionId: number, fieldId: number) {
   const [option] = await db.select().from(fieldOptions).where(eq(fieldOptions.id, optionId)).limit(1);
 
-  if (!option || option.fieldId !== fieldId) throw notFound("Option not found");
+  if (!option || option.fieldId !== fieldId || option.deletedAt) throw notFound("Option not found");
   return option;
 }
 
@@ -183,9 +297,11 @@ async function loadFormForViewer(where: SQL) {
     where,
     with: {
       formFields: {
+        where: (fields, { isNull }) => isNull(fields.deletedAt),
         orderBy: (fields, { asc }) => [asc(fields.fieldOrder)],
         with: {
           fieldOptions: {
+            where: (options, { isNull }) => isNull(options.deletedAt),
             orderBy: (options, { asc }) => [asc(options.optionOrder)],
           },
         },
@@ -295,9 +411,11 @@ export const formService = {
       where: eq(forms.id, id),
       with: {
         formFields: {
+          where: (fields, { isNull }) => isNull(fields.deletedAt),
           orderBy: (fields, { asc }) => [asc(fields.fieldOrder)],
           with: {
             fieldOptions: {
+              where: (options, { isNull }) => isNull(options.deletedAt),
               orderBy: (options, { asc }) => [asc(options.optionOrder)],
             },
           },
@@ -524,14 +642,13 @@ export const formService = {
           .where(eq(submissions.formId, id));
 
         if ((tally?.value ?? 0) > 0) {
-          throw badRequest(
-            "This form already has responses, so its questions can no longer be changed. Duplicate it to start a new version.",
-          );
+          // Responses exist — edit in place and soft-delete removals (see applyFieldEdits).
+          await applyFieldEdits(tx, id, fields);
+        } else {
+          // No responses to lose: replace the whole field list. Options cascade-delete with their field.
+          await tx.delete(formFields).where(eq(formFields.formId, id));
+          await insertFields(tx, id, fields);
         }
-
-        // Replace the whole field list. Options cascade-delete with their field.
-        await tx.delete(formFields).where(eq(formFields.formId, id));
-        await insertFields(tx, id, fields);
       }
 
       if (allowedEmails) {
@@ -611,7 +728,12 @@ export const formService = {
   async removeField(formId: number, fieldId: number, adminId: number) {
     await getOwnedForm(formId, adminId);
     await getFieldOrThrow(fieldId, formId);
-    await db.delete(formFields).where(eq(formFields.id, fieldId));
+    if (await hasSubmissions(formId)) {
+      // Answers reference this field (ON DELETE CASCADE) — hide it, keep the data.
+      await db.update(formFields).set({ deletedAt: nowIso() }).where(eq(formFields.id, fieldId));
+    } else {
+      await db.delete(formFields).where(eq(formFields.id, fieldId));
+    }
     await touchForm(formId);
   },
 
@@ -621,7 +743,7 @@ export const formService = {
     const existingFields = await db
       .select({ id: formFields.id })
       .from(formFields)
-      .where(eq(formFields.formId, formId));
+      .where(and(eq(formFields.formId, formId), isNull(formFields.deletedAt)));
     const existingIds = new Set(existingFields.map((field) => field.id));
 
     if (fieldIds.length !== existingIds.size || !fieldIds.every((id) => existingIds.has(id))) {
@@ -693,7 +815,11 @@ export const formService = {
     await getOwnedForm(formId, adminId);
     await getFieldOrThrow(fieldId, formId);
     await getOptionOrThrow(optionId, fieldId);
-    await db.delete(fieldOptions).where(eq(fieldOptions.id, optionId));
+    if (await hasSubmissions(formId)) {
+      await db.update(fieldOptions).set({ deletedAt: nowIso() }).where(eq(fieldOptions.id, optionId));
+    } else {
+      await db.delete(fieldOptions).where(eq(fieldOptions.id, optionId));
+    }
     await touchForm(formId);
   },
 };
