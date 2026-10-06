@@ -623,17 +623,19 @@ export const analyticsService = {
     for (const row of pointRows) {
       if (isSentiment(row.sentiment)) overall[row.sentiment] += 1;
     }
-    const overallTotal = overall.negative + overall.neutral + overall.positive || 1;
-    const pct = (value: number) => Math.round((value / overallTotal) * 100);
+    // Score on 0–5: positive = 5, neutral = 2.5, negative = 0 — i.e. net sentiment
+    // (−1…+1) stretched onto the gauge. Same formula as the client's topic panel
+    // (gnp-client sentimentScore). Shares are derived client-side from the counts.
+    const overallTotal = overall.negative + overall.neutral + overall.positive;
     const sentiment = {
-      score:
-        Math.round(
-          ((overall.positive * 5 + overall.neutral * 3 + overall.negative) / overallTotal) * 10,
-        ) / 10,
+      score: overallTotal
+        ? Math.round(((overall.positive * 5 + overall.neutral * 2.5) / overallTotal) * 10) / 10
+        : 0,
       outOf: 5,
-      negative: pct(overall.negative),
-      neutral: pct(overall.neutral),
-      positive: pct(overall.positive),
+      /** Raw feedback-point counts. */
+      negative: overall.negative,
+      neutral: overall.neutral,
+      positive: overall.positive,
     };
 
     const assigned = pointRows.filter((row) => row.topicId !== null && isSentiment(row.sentiment));
