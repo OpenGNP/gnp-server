@@ -16,6 +16,22 @@ const parseIds = (value?: string): number[] | undefined => {
   return ids.length > 0 ? ids : undefined;
 };
 
+/** '{"Year":["1","2"]}' → { Year: ["1","2"] }; anything malformed is ignored. */
+const parseDemoFilter = (value?: string): Record<string, string[]> | undefined => {
+  if (!value) return undefined;
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return undefined;
+    const out: Record<string, string[]> = {};
+    for (const [label, values] of Object.entries(parsed)) {
+      if (Array.isArray(values)) out[label] = values.filter((v): v is string => typeof v === "string");
+    }
+    return out;
+  } catch {
+    return undefined;
+  }
+};
+
 export const analyticsController = {
   summary(adminId: number) {
     return analyticsService.summary(adminId);
@@ -32,11 +48,12 @@ export const analyticsController = {
   formThemes(
     formId: number,
     adminId: number,
-    query: { from?: string; to?: string } = {},
+    query: { from?: string; to?: string; demo?: string } = {},
   ) {
     return analyticsService.formThemes(formId, adminId, {
       from: parseMs(query.from),
       to: parseMs(query.to),
+      demo: parseDemoFilter(query.demo),
     });
   },
 

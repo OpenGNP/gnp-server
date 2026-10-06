@@ -471,7 +471,7 @@ export const analyticsService = {
   async formThemes(
     formId: number,
     adminId: number,
-    opts: { from?: number; to?: number } = {},
+    opts: { from?: number; to?: number; demo?: Record<string, string[]> } = {},
   ) {
     const form = await assertFormOwner(formId, adminId);
 
@@ -499,11 +499,10 @@ export const analyticsService = {
       lte(submissions.createdAt, toIso),
     );
 
-    const [totals] = await db
-      .select({ value: count() })
+    const windowSubmissions = await db
+      .select({ id: submissions.id })
       .from(submissions)
       .where(and(eq(submissions.formId, formId), inWindow));
-    const totalResponders = totals?.value ?? 0;
 
     const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
     const [recent] = await db
@@ -529,24 +528,6 @@ export const analyticsService = {
       .innerJoin(submissions, eq(answers.submissionId, submissions.id))
       .where(and(eq(submissions.formId, formId), inWindow))
       .orderBy(desc(submissions.createdAt));
-
-    // Overall sentiment (every point, assigned to a topic or not).
-    const overall: Record<Sentiment, number> = { negative: 0, neutral: 0, positive: 0 };
-    for (const row of pointRows) {
-      if (isSentiment(row.sentiment)) overall[row.sentiment] += 1;
-    }
-    const overallTotal = overall.negative + overall.neutral + overall.positive || 1;
-    const pct = (value: number) => Math.round((value / overallTotal) * 100);
-    const sentiment = {
-      score:
-        Math.round(
-          ((overall.positive * 5 + overall.neutral * 3 + overall.negative) / overallTotal) * 10,
-        ) / 10,
-      outOf: 5,
-      negative: pct(overall.negative),
-      neutral: pct(overall.neutral),
-      positive: pct(overall.positive),
-    };
 
     // The respondent's demographic answers per submission — whatever single-choice
     // questions this form's demographic section has (Year, Department, Age, …), kept
@@ -583,6 +564,56 @@ export const analyticsService = {
       });
       demoBySubmission.set(row.submissionId, list);
     }
+
+    // Demographic filter: keep only submissions whose answer to every selected
+    // question is one of the chosen values. `demographicFilters` is built from the
+    // unfiltered answers so the options don't vanish as the user narrows down.
+    const filterEntries = Object.entries(opts.demo ?? {}).filter(([, values]) => values.length > 0);
+    const matchesDemo = (submissionId: number) =>
+      filterEntries.every(([label, values]) =>
+        (demoBySubmission.get(submissionId) ?? []).some(
+          (entry) => entry.label === label && values.includes(entry.value || "Unspecified"),
+        ),
+      );
+    const demographicFilters = (() => {
+      const byField = new Map<number, { order: number; label: string; options: Set<string> }>();
+      for (const row of demoRows) {
+        const group = byField.get(row.fieldId) ?? {
+          order: row.order ?? 0,
+          label: row.label ?? "Question",
+          options: new Set<string>(),
+        };
+        group.options.add(row.option || "Unspecified");
+        byField.set(row.fieldId, group);
+      }
+      return [...byField.values()]
+        .sort((a, b) => a.order - b.order)
+        .map((group) => ({ label: group.label, options: [...group.options].sort() }));
+    })();
+
+    if (filterEntries.length > 0) {
+      for (let i = pointRows.length - 1; i >= 0; i -= 1) {
+        if (!matchesDemo(pointRows[i]!.submissionId)) pointRows.splice(i, 1);
+      }
+    }
+    const totalResponders = windowSubmissions.filter((row) => matchesDemo(row.id)).length;
+
+    const overall: Record<Sentiment, number> = { negative: 0, neutral: 0, positive: 0 };
+    for (const row of pointRows) {
+      if (isSentiment(row.sentiment)) overall[row.sentiment] += 1;
+    }
+    const overallTotal = overall.negative + overall.neutral + overall.positive || 1;
+    const pct = (value: number) => Math.round((value / overallTotal) * 100);
+    const sentiment = {
+      score:
+        Math.round(
+          ((overall.positive * 5 + overall.neutral * 3 + overall.negative) / overallTotal) * 10,
+        ) / 10,
+      outOf: 5,
+      negative: pct(overall.negative),
+      neutral: pct(overall.neutral),
+      positive: pct(overall.positive),
+    };
 
     const assigned = pointRows.filter((row) => row.topicId !== null && isSentiment(row.sentiment));
     const assignedTotal = assigned.length || 1;
@@ -654,6 +685,7 @@ export const analyticsService = {
       totalMentions,
       totalResponders,
       responderDeltaLabel: `+${recentResponders} this week`,
+      demographicFilters,
       sentiment,
       highIntenseTopics: topics.filter((topic) => topic.isHighIntensity),
       aiDiscoveredTopics: topics,
