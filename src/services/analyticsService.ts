@@ -12,6 +12,7 @@ import {
 } from "../db/client";
 import { forbidden, notFound } from "../utils/errors";
 import { parseDbTimestamp } from "../utils/timestamp";
+import { createCalendar, resolveTimeZone, type Calendar } from "../utils/timezone";
 
 const SENTIMENT_LABELS = ["positive", "neutral", "negative"] as const;
 
@@ -159,15 +160,6 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 /** DB `timestamptz` string → epoch ms (see parseDbTimestamp). */
 const parseTs = parseDbTimestamp;
 
-/** Short UTC date for range labels, e.g. "8 Jun 2026". */
-const fmtDateUTC = (t: number): string =>
-  new Date(t).toLocaleDateString("en-US", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    timeZone: "UTC",
-  });
-
 /**
  * Default analytics window for a form (Trend + Themes tabs share this): the span of
  * its analysed feedback, first mention → last mention, so the tab opens on *all*
@@ -204,52 +196,6 @@ const TREND_SERIES_MAX = 8;
 /** Rows sent to the picker — beyond this, topics have negligible volume anyway. */
 const TREND_AVAILABLE_LIMIT = 500;
 
-/** Start-of-period (UTC) for `ms` — day, ISO week (Mon), calendar month, or calendar year. */
-function bucketStart(ms: number, b: TrendBucket): number {
-  const d = new Date(ms);
-  const y = d.getUTCFullYear();
-  const m = d.getUTCMonth();
-  const day = d.getUTCDate();
-  if (b === "day") return Date.UTC(y, m, day);
-  if (b === "week") {
-    const dow = d.getUTCDay(); // 0 Sun … 6 Sat
-    return Date.UTC(y, m, day + (dow === 0 ? -6 : 1 - dow));
-  }
-  if (b === "month") return Date.UTC(y, m, 1);
-  return Date.UTC(y, 0, 1);
-}
-
-function bucketNext(ms: number, b: TrendBucket): number {
-  const d = new Date(ms);
-  const y = d.getUTCFullYear();
-  const m = d.getUTCMonth();
-  const day = d.getUTCDate();
-  if (b === "day") return Date.UTC(y, m, day + 1);
-  if (b === "week") return Date.UTC(y, m, day + 7);
-  if (b === "month") return Date.UTC(y, m + 1, 1);
-  return Date.UTC(y + 1, 0, 1);
-}
-
-/** Start of the bucket immediately before `ms` — the calendar-aware inverse of bucketNext. */
-function bucketPrev(ms: number, b: TrendBucket): number {
-  const d = new Date(ms);
-  const y = d.getUTCFullYear();
-  const m = d.getUTCMonth();
-  const day = d.getUTCDate();
-  if (b === "day") return Date.UTC(y, m, day - 1);
-  if (b === "week") return Date.UTC(y, m, day - 7);
-  if (b === "month") return Date.UTC(y, m - 1, 1);
-  return Date.UTC(y - 1, 0, 1);
-}
-
-function bucketLabel(ms: number, b: TrendBucket): string {
-  const d = new Date(ms);
-  if (b === "year") return String(d.getUTCFullYear());
-  if (b === "month")
-    return d.toLocaleDateString("en-US", { month: "short", year: "numeric", timeZone: "UTC" });
-  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
-}
-
 /** Bucket sizes tried finest → coarsest: a unit plus how many units each bucket spans. */
 const VOLUME_STEPS: readonly { bucket: TrendBucket; every: number }[] = [
   { bucket: "day", every: 1 },
@@ -274,6 +220,7 @@ const VOLUME_STEPS: readonly { bucket: TrendBucket; every: number }[] = [
  * finest step can give; one too long for any step is capped at the coarsest.
  */
 function volumeBuckets(
+  cal: Calendar,
   from: number,
   to: number,
   min: number,
@@ -281,10 +228,10 @@ function volumeBuckets(
 ): { bucket: TrendBucket; starts: number[] } {
   const startsFor = ({ bucket, every }: (typeof VOLUME_STEPS)[number]) => {
     const out: number[] = [];
-    let t = bucketStart(from, bucket);
+    let t = cal.start(from, bucket);
     while (t <= to) {
       out.push(t);
-      for (let i = 0; i < every; i += 1) t = bucketNext(t, bucket);
+      for (let i = 0; i < every; i += 1) t = cal.next(t, bucket);
     }
     return out;
   };
@@ -529,9 +476,10 @@ export const analyticsService = {
   async formThemes(
     formId: number,
     adminId: number,
-    opts: { from?: number; to?: number; demo?: Record<string, string[]> } = {},
+    opts: { from?: number; to?: number; demo?: Record<string, string[]>; timeZone?: string } = {},
   ) {
     const form = await assertFormOwner(formId, adminId);
+    const cal = createCalendar(resolveTimeZone(opts.timeZone));
 
     // Resolve the analysis window the same way the Trend tab does: default to the
     // span of this form's analysed feedback, explicit from/to win.
@@ -551,7 +499,7 @@ export const analyticsService = {
     const { from, to } = resolveFeedbackWindow(opts, earliestMs, latestMs);
     const fromIso = new Date(from).toISOString();
     const toIso = new Date(to).toISOString();
-    const rangeLabel = `${fmtDateUTC(from)} – ${fmtDateUTC(to)}`;
+    const rangeLabel = `${cal.date(from)} – ${cal.date(to)}`;
     const inWindow = and(
       gte(submissions.createdAt, fromIso),
       lte(submissions.createdAt, toIso),
@@ -706,7 +654,7 @@ export const analyticsService = {
         : [];
     const metaById = new Map(topicMeta.map((meta) => [meta.id, meta]));
 
-    const volume = volumeBuckets(from, to, THEME_VOLUME_MIN_POINTS, THEME_VOLUME_MAX_POINTS);
+    const volume = volumeBuckets(cal, from, to, THEME_VOLUME_MIN_POINTS, THEME_VOLUME_MAX_POINTS);
     const bucketIndexOf = (iso: string | null) => {
       const t = iso ? parseTs(iso) : NaN;
       if (Number.isNaN(t)) return -1;
@@ -756,7 +704,7 @@ export const analyticsService = {
         keywords: parseKeywords(meta?.keywords ?? null),
         feedbackSegment,
         volumeSeries: volume.starts.map((start, i) => ({
-          label: bucketLabel(start, volume.bucket),
+          label: cal.label(start, volume.bucket),
           value: volumeCounts[i]!,
         })),
       };
@@ -804,9 +752,11 @@ export const analyticsService = {
       bucket?: TrendBucket;
       rank?: TrendRank;
       topics?: number[];
+      timeZone?: string;
     } = {},
   ): Promise<FormTrend> {
     await assertFormOwner(formId, adminId);
+    const cal = createCalendar(resolveTimeZone(opts.timeZone));
 
     // Analysed mentions for this form across all time + when the first/last one landed —
     // used for `totalMentions` and to anchor the default window on real data.
@@ -830,7 +780,7 @@ export const analyticsService = {
     // No explicit bucket = "auto": pick a step that gives the charts 6–12 x-axis points
     // (it can span several units, e.g. 2 weeks). `bkt` is then that step's unit, which
     // the rising/declining comparison below keeps using.
-    const autoVolume = opts.bucket ? null : volumeBuckets(from, to, TREND_POINTS_MIN, TREND_POINTS_MAX);
+    const autoVolume = opts.bucket ? null : volumeBuckets(cal, from, to, TREND_POINTS_MIN, TREND_POINTS_MAX);
     const bkt: TrendBucket = opts.bucket ?? autoVolume!.bucket;
     const rank: TrendRank = opts.rank ?? "mentioned";
     // Rising/declining topics compare the latest bucket (anchored to `to`, the
@@ -839,11 +789,11 @@ export const analyticsService = {
     // baseline on its own. `prevBucketStart` just widens the row fetch below one
     // bucket further back as a floor, in case an explicit `bucket` is coarser than
     // the selected range (e.g. bucket "year" with a 5-day custom range).
-    const latestBucketStart = bucketStart(to, bkt);
-    const prevBucketStart = bucketPrev(latestBucketStart, bkt);
+    const latestBucketStart = cal.start(to, bkt);
+    const prevBucketStart = cal.prev(latestBucketStart, bkt);
     const prevFrom = Math.min(from - span, prevBucketStart);
 
-    const rangeLabel = `${fmtDateUTC(from)} – ${fmtDateUTC(to)}`;
+    const rangeLabel = `${cal.date(from)} – ${cal.date(to)}`;
     const comparisonLabel = `vs typical ${bkt}`;
     const fromIso = new Date(from).toISOString();
     const toIso = new Date(to).toISOString();
@@ -954,7 +904,7 @@ export const analyticsService = {
     // handles variable-length month/year buckets elsewhere in this function).
     const countBuckets = (startMs: number, endMsExclusive: number): number => {
       let n = 0;
-      for (let k = bucketStart(startMs, bkt); k < endMsExclusive && n < 5000; k = bucketNext(k, bkt)) {
+      for (let k = cal.start(startMs, bkt); k < endMsExclusive && n < 5000; k = cal.next(k, bkt)) {
         n++;
       }
       return n;
@@ -1073,14 +1023,14 @@ export const analyticsService = {
       bucketKeys.push(...autoVolume.starts);
     } else {
       for (
-        let k = bucketStart(from, bkt);
+        let k = cal.start(from, bkt);
         k <= to && bucketKeys.length < 400;
-        k = bucketNext(k, bkt)
+        k = cal.next(k, bkt)
       ) {
         bucketKeys.push(k);
       }
     }
-    if (bucketKeys.length === 0) bucketKeys.push(bucketStart(from, bkt));
+    if (bucketKeys.length === 0) bucketKeys.push(cal.start(from, bkt));
     // Last bucket starting at or before `t` (clamped into range) — handles multi-unit steps.
     const idxFor = (t: number) => {
       let index = 0;
@@ -1089,7 +1039,7 @@ export const analyticsService = {
     };
 
     const volumeSeries: TrendVolumePoint[] = bucketKeys.map((k) => {
-      const point: TrendVolumePoint = { label: bucketLabel(k, bkt) };
+      const point: TrendVolumePoint = { label: cal.label(k, bkt) };
       for (const id of seriesIds) point[String(id)] = 0;
       return point;
     });
@@ -1112,10 +1062,10 @@ export const analyticsService = {
     const sentimentSeries: TrendSentimentPoint[] = bucketKeys.map((k, i) => {
       const raw = sentimentRaw[i]!;
       const total = raw.negative + raw.neutral + raw.positive;
-      if (total === 0) return { label: bucketLabel(k, bkt), negative: 0, neutral: 0, positive: 0 };
+      if (total === 0) return { label: cal.label(k, bkt), negative: 0, neutral: 0, positive: 0 };
       const negative = Math.round((raw.negative / total) * 100);
       const neutral = Math.round((raw.neutral / total) * 100);
-      return { label: bucketLabel(k, bkt), negative, neutral, positive: 100 - negative - neutral };
+      return { label: cal.label(k, bkt), negative, neutral, positive: 100 - negative - neutral };
     });
 
     const timelineEvents = bucketTotals

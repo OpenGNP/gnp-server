@@ -48,12 +48,13 @@ export const analyticsController = {
   formThemes(
     formId: number,
     adminId: number,
-    query: { from?: string; to?: string; demo?: string } = {},
+    query: { from?: string; to?: string; demo?: string; tz?: string } = {},
   ) {
     return analyticsService.formThemes(formId, adminId, {
       from: parseMs(query.from),
       to: parseMs(query.to),
       demo: parseDemoFilter(query.demo),
+      timeZone: query.tz,
     });
   },
 
@@ -66,6 +67,7 @@ export const analyticsController = {
       bucket?: string;
       rank?: string;
       topics?: string;
+      tz?: string;
     } = {},
   ) {
     return analyticsService.formTrend(formId, adminId, {
@@ -74,6 +76,7 @@ export const analyticsController = {
       bucket: isTrendBucket(query.bucket) ? query.bucket : undefined,
       rank: isTrendRank(query.rank) ? query.rank : undefined,
       topics: parseIds(query.topics),
+      timeZone: query.tz,
     });
   },
 };
