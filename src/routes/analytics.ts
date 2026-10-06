@@ -46,6 +46,7 @@ export const analyticsRoutes = new Elysia({ prefix: "/analytics" })
       const data = await analyticsController.formThemes(id, currentUser.id, {
         from: typeof query.from === "string" ? query.from : undefined,
         to: typeof query.to === "string" ? query.to : undefined,
+        demo: typeof query.demo === "string" ? query.demo : undefined,
       });
       return successResponse("Form theme analytics loaded successfully", data);
     },
@@ -54,7 +55,8 @@ export const analyticsRoutes = new Elysia({ prefix: "/analytics" })
         tags,
         security,
         summary: "Topic / sentiment analysis for one form (Themes tab)",
-        description: "Query: from / to (ISO dates) — defaults to the span of the form's analysed feedback.",
+        description: "Query: from / to (ISO dates) — defaults to the span of the form's analysed feedback. " +
+          "demo (JSON object {question label: [answers]}) narrows to respondents matching every selected question.",
       },
     },
   )
