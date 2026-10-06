@@ -47,6 +47,8 @@ export type ThemeFeedbackPoint = {
   demographics: { label: string; value: string }[];
 };
 
+export type ThemeVolumePoint = { label: string; value: number };
+
 export type ThemeTopic = {
   id: string;
   label: string;
@@ -58,7 +60,16 @@ export type ThemeTopic = {
   aiSummary: string;
   keywords: ThemeKeyword[];
   feedbackSegment: ThemeFeedbackPoint[];
+  /** Mentions per bucket across the selected window (page filters applied); THEME_VOLUME_MIN_POINTS–MAX points. */
+  volumeSeries: ThemeVolumePoint[];
 };
+
+/** The Trend tab's auto-bucketed charts get 6–12 x-axis points. */
+const TREND_POINTS_MIN = 6;
+const TREND_POINTS_MAX = 12;
+/** The topic panel's volume chart gets 4–8 x-axis points. */
+const THEME_VOLUME_MIN_POINTS = 4;
+const THEME_VOLUME_MAX_POINTS = 8;
 
 export type TopicMovementStatus = "existing" | "new" | "inactive";
 
@@ -193,15 +204,6 @@ const TREND_SERIES_MAX = 8;
 /** Rows sent to the picker — beyond this, topics have negligible volume anyway. */
 const TREND_AVAILABLE_LIMIT = 500;
 
-/** Pick a bucket size from the window span when the caller doesn't specify one. */
-function autoBucket(spanMs: number): TrendBucket {
-  const days = spanMs / DAY_MS;
-  if (days <= 21) return "day";
-  if (days <= 120) return "week";
-  if (days <= 800) return "month";
-  return "year";
-}
-
 /** Start-of-period (UTC) for `ms` — day, ISO week (Mon), calendar month, or calendar year. */
 function bucketStart(ms: number, b: TrendBucket): number {
   const d = new Date(ms);
@@ -246,6 +248,55 @@ function bucketLabel(ms: number, b: TrendBucket): string {
   if (b === "month")
     return d.toLocaleDateString("en-US", { month: "short", year: "numeric", timeZone: "UTC" });
   return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
+}
+
+/** Bucket sizes tried finest → coarsest: a unit plus how many units each bucket spans. */
+const VOLUME_STEPS: readonly { bucket: TrendBucket; every: number }[] = [
+  { bucket: "day", every: 1 },
+  { bucket: "day", every: 2 },
+  { bucket: "day", every: 3 },
+  { bucket: "week", every: 1 },
+  { bucket: "week", every: 2 },
+  { bucket: "month", every: 1 },
+  { bucket: "month", every: 2 },
+  { bucket: "month", every: 3 },
+  { bucket: "month", every: 6 },
+  { bucket: "year", every: 1 },
+  { bucket: "year", every: 2 },
+  { bucket: "year", every: 5 },
+  { bucket: "year", every: 10 },
+  { bucket: "year", every: 25 },
+];
+
+/**
+ * Chart buckets for a window: the finest step that yields between `min` and `max`
+ * points. A window too short to reach `min` (under ~4 days) gets the most points the
+ * finest step can give; one too long for any step is capped at the coarsest.
+ */
+function volumeBuckets(
+  from: number,
+  to: number,
+  min: number,
+  max: number,
+): { bucket: TrendBucket; starts: number[] } {
+  const startsFor = ({ bucket, every }: (typeof VOLUME_STEPS)[number]) => {
+    const out: number[] = [];
+    let t = bucketStart(from, bucket);
+    while (t <= to) {
+      out.push(t);
+      for (let i = 0; i < every; i += 1) t = bucketNext(t, bucket);
+    }
+    return out;
+  };
+  let fallback: { bucket: TrendBucket; starts: number[] } | null = null;
+  for (const step of VOLUME_STEPS) {
+    const starts = startsFor(step);
+    if (starts.length >= min && starts.length <= max) return { bucket: step.bucket, starts };
+    if (starts.length <= max && !fallback) fallback = { bucket: step.bucket, starts };
+  }
+  if (fallback) return fallback;
+  const last = VOLUME_STEPS[VOLUME_STEPS.length - 1]!;
+  return { bucket: last.bucket, starts: startsFor(last).slice(0, max) };
 }
 
 const SENTIMENTS: readonly Sentiment[] = ["negative", "neutral", "positive"];
@@ -633,6 +684,15 @@ export const analyticsService = {
         : [];
     const metaById = new Map(topicMeta.map((meta) => [meta.id, meta]));
 
+    const volume = volumeBuckets(from, to, THEME_VOLUME_MIN_POINTS, THEME_VOLUME_MAX_POINTS);
+    const bucketIndexOf = (iso: string | null) => {
+      const t = iso ? parseTs(iso) : NaN;
+      if (Number.isNaN(t)) return -1;
+      let index = -1;
+      for (let i = 0; i < volume.starts.length && volume.starts[i]! <= t; i += 1) index = i;
+      return index;
+    };
+
     const topics: ThemeTopic[] = topicIds.map((topicId) => {
       const meta = metaById.get(topicId);
       const rows = assigned.filter((row) => row.topicId === topicId);
@@ -642,7 +702,12 @@ export const analyticsService = {
         counts[row.sentiment as Sentiment] += 1;
         if (row.severe) severe += 1;
       }
-      const topicTotal = rows.length || 1;
+
+      const volumeCounts = volume.starts.map(() => 0);
+      for (const row of rows) {
+        const index = bucketIndexOf(row.submittedAt);
+        if (index >= 0) volumeCounts[index]! += 1;
+      }
 
       // Every point in the topic, not a sample — the panel has its own sort and filter.
       const feedbackSegment: ThemeFeedbackPoint[] = rows.map((row) => ({
@@ -668,6 +733,10 @@ export const analyticsService = {
         aiSummary: meta?.summary ?? "",
         keywords: parseKeywords(meta?.keywords ?? null),
         feedbackSegment,
+        volumeSeries: volume.starts.map((start, i) => ({
+          label: bucketLabel(start, volume.bucket),
+          value: volumeCounts[i]!,
+        })),
       };
     });
 
@@ -736,7 +805,11 @@ export const analyticsService = {
     // Default window = the span of this form's analysed feedback (see
     // resolveFeedbackWindow). Explicit from/to from the date filter always win.
     const { from, to, span } = resolveFeedbackWindow(opts, earliestMs, latestMs);
-    const bkt: TrendBucket = opts.bucket ?? autoBucket(span);
+    // No explicit bucket = "auto": pick a step that gives the charts 6–12 x-axis points
+    // (it can span several units, e.g. 2 weeks). `bkt` is then that step's unit, which
+    // the rising/declining comparison below keeps using.
+    const autoVolume = opts.bucket ? null : volumeBuckets(from, to, TREND_POINTS_MIN, TREND_POINTS_MAX);
+    const bkt: TrendBucket = opts.bucket ?? autoVolume!.bucket;
     const rank: TrendRank = opts.rank ?? "mentioned";
     // Rising/declining topics compare the latest bucket (anchored to `to`, the
     // latest selected date) against each topic's own historical average per bucket
@@ -974,18 +1047,24 @@ export const analyticsService = {
 
     // --- real time series over the selected window --------------------------
     const bucketKeys: number[] = [];
-    for (
-      let k = bucketStart(from, bkt);
-      k <= to && bucketKeys.length < 400;
-      k = bucketNext(k, bkt)
-    ) {
-      bucketKeys.push(k);
+    if (autoVolume) {
+      bucketKeys.push(...autoVolume.starts);
+    } else {
+      for (
+        let k = bucketStart(from, bkt);
+        k <= to && bucketKeys.length < 400;
+        k = bucketNext(k, bkt)
+      ) {
+        bucketKeys.push(k);
+      }
     }
     if (bucketKeys.length === 0) bucketKeys.push(bucketStart(from, bkt));
-    const keyIndex = new Map(bucketKeys.map((k, i) => [k, i]));
-    const idxFor = (t: number) =>
-      keyIndex.get(bucketStart(t, bkt)) ??
-      (t < bucketKeys[0]! ? 0 : bucketKeys.length - 1);
+    // Last bucket starting at or before `t` (clamped into range) — handles multi-unit steps.
+    const idxFor = (t: number) => {
+      let index = 0;
+      for (let i = 0; i < bucketKeys.length && bucketKeys[i]! <= t; i += 1) index = i;
+      return index;
+    };
 
     const volumeSeries: TrendVolumePoint[] = bucketKeys.map((k) => {
       const point: TrendVolumePoint = { label: bucketLabel(k, bkt) };
