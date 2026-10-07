@@ -74,6 +74,7 @@ export const analyticsRoutes = new Elysia({ prefix: "/analytics" })
         rank: typeof query.rank === "string" ? query.rank : undefined,
         topics: typeof query.topics === "string" ? query.topics : undefined,
         tz: typeof query.tz === "string" ? query.tz : undefined,
+        demo: typeof query.demo === "string" ? query.demo : undefined,
       });
       return successResponse("Form trend analytics loaded successfully", data);
     },
@@ -85,7 +86,8 @@ export const analyticsRoutes = new Elysia({ prefix: "/analytics" })
         description:
           "Query: from / to (ISO dates), bucket (day | week | month | year), " +
           "rank (movers | mentioned | severe — orders availableTopics + auto-picks lines), " +
-          "topics (comma-separated topic ids to chart, max 8), tz (IANA zone — where days start; default UTC). " +
+          "topics (comma-separated topic ids to chart, max 8), tz (IANA zone — where days start; default UTC), " +
+          "demo (same JSON demographic filter as /themes). " +
           "Returns a real time series plus availableTopics for the picker.",
       },
     },

@@ -272,6 +272,98 @@ async function assertFormOwner(formId: number, adminId: number) {
   return form;
 }
 
+/**
+ * A form's demographic answers + the Themes/Trend demographic filter. `demo` maps a
+ * demographic question label to the chosen answers; a submission matches when its
+ * answer to every non-empty entry is one of them.
+ */
+async function loadDemographics(formId: number, demo: Record<string, string[]> | undefined) {
+  // The respondent's demographic answers per submission — whatever single-choice
+  // questions this form's demographic section has (Year, Department, Age, …), kept
+  // generic and in form order rather than mapped to fixed slots.
+  const demoRows = await db
+    .select({
+      submissionId: answers.submissionId,
+      fieldId: formFields.id,
+      order: formFields.fieldOrder,
+      label: formFields.fieldLabel,
+      option: fieldOptions.optionLabel,
+    })
+    .from(answers)
+    .innerJoin(formFields, eq(answers.fieldId, formFields.id))
+    .innerJoin(fieldOptions, eq(answers.answerOptionId, fieldOptions.id))
+    .where(
+      and(
+        eq(formFields.formId, formId),
+        eq(formFields.section, "demographic"),
+        eq(formFields.fieldType, "radio"),
+      ),
+    );
+
+  type DemoAnswer = { fieldId: number; order: number; label: string; value: string };
+  const demoBySubmission = new Map<number, DemoAnswer[]>();
+  for (const row of demoRows) {
+    const list = demoBySubmission.get(row.submissionId) ?? [];
+    if (list.some((entry) => entry.fieldId === row.fieldId)) continue; // one answer per radio field
+    list.push({
+      fieldId: row.fieldId,
+      order: row.order ?? 0,
+      label: row.label ?? "Question",
+      value: row.option ?? "",
+    });
+    demoBySubmission.set(row.submissionId, list);
+  }
+
+  // Demographic filter: keep only submissions whose answer to every selected
+  // question is one of the chosen values. `demographicFilters` (below) comes from the
+  // form definition, so the options don't vanish as the user narrows down.
+  const filterEntries = Object.entries(demo ?? {}).filter(([, values]) => values.length > 0);
+  const matchesDemo = (submissionId: number) =>
+    filterEntries.every(([label, values]) =>
+      (demoBySubmission.get(submissionId) ?? []).some(
+        (entry) => entry.label === label && values.includes(entry.value || "Unspecified"),
+      ),
+    );
+  // Every demographic question and answer option the form has in the database —
+  // current and soft-deleted — not just the ones respondents happened to pick. Groups
+  // are keyed by label (that's what the filter matches on), so a removed question and
+  // its replacement of the same name share one group.
+  const demoFieldRows = await db
+    .select({
+      fieldOrder: formFields.fieldOrder,
+      label: formFields.fieldLabel,
+      optionLabel: fieldOptions.optionLabel,
+      optionOrder: fieldOptions.optionOrder,
+    })
+    .from(formFields)
+    .leftJoin(fieldOptions, eq(fieldOptions.fieldId, formFields.id))
+    .where(
+      and(
+        eq(formFields.formId, formId),
+        eq(formFields.section, "demographic"),
+        eq(formFields.fieldType, "radio"),
+      ),
+    )
+    .orderBy(formFields.fieldOrder, fieldOptions.optionOrder);
+  const demographicFilters = (() => {
+    const byLabel = new Map<string, Set<string>>();
+    for (const row of demoFieldRows) {
+      const options = byLabel.get(row.label ?? "Question") ?? new Set<string>();
+      if (row.optionLabel) options.add(row.optionLabel);
+      byLabel.set(row.label ?? "Question", options);
+    }
+    return [...byLabel.entries()].map(([label, options]) => ({ label, options: [...options] }));
+  })();
+
+
+  return {
+    demoBySubmission,
+    matchesDemo,
+    isFiltering: filterEntries.length > 0,
+    demographicFilters,
+  };
+}
+
 export const analyticsService = {
   async summary(adminId: number) {
     const [formsCount] = await db.select({ value: count() }).from(forms).where(eq(forms.adminId, adminId));
@@ -528,84 +620,12 @@ export const analyticsService = {
       .where(and(eq(submissions.formId, formId), inWindow))
       .orderBy(desc(submissions.createdAt));
 
-    // The respondent's demographic answers per submission — whatever single-choice
-    // questions this form's demographic section has (Year, Department, Age, …), kept
-    // generic and in form order rather than mapped to fixed slots.
-    const demoRows = await db
-      .select({
-        submissionId: answers.submissionId,
-        fieldId: formFields.id,
-        order: formFields.fieldOrder,
-        label: formFields.fieldLabel,
-        option: fieldOptions.optionLabel,
-      })
-      .from(answers)
-      .innerJoin(formFields, eq(answers.fieldId, formFields.id))
-      .innerJoin(fieldOptions, eq(answers.answerOptionId, fieldOptions.id))
-      .where(
-        and(
-          eq(formFields.formId, formId),
-          eq(formFields.section, "demographic"),
-          eq(formFields.fieldType, "radio"),
-        ),
-      );
+    const { demoBySubmission, matchesDemo, isFiltering, demographicFilters } = await loadDemographics(
+      formId,
+      opts.demo,
+    );
 
-    type DemoAnswer = { fieldId: number; order: number; label: string; value: string };
-    const demoBySubmission = new Map<number, DemoAnswer[]>();
-    for (const row of demoRows) {
-      const list = demoBySubmission.get(row.submissionId) ?? [];
-      if (list.some((entry) => entry.fieldId === row.fieldId)) continue; // one answer per radio field
-      list.push({
-        fieldId: row.fieldId,
-        order: row.order ?? 0,
-        label: row.label ?? "Question",
-        value: row.option ?? "",
-      });
-      demoBySubmission.set(row.submissionId, list);
-    }
-
-    // Demographic filter: keep only submissions whose answer to every selected
-    // question is one of the chosen values. `demographicFilters` (below) comes from the
-    // form definition, so the options don't vanish as the user narrows down.
-    const filterEntries = Object.entries(opts.demo ?? {}).filter(([, values]) => values.length > 0);
-    const matchesDemo = (submissionId: number) =>
-      filterEntries.every(([label, values]) =>
-        (demoBySubmission.get(submissionId) ?? []).some(
-          (entry) => entry.label === label && values.includes(entry.value || "Unspecified"),
-        ),
-      );
-    // Every demographic question and answer option the form has in the database —
-    // current and soft-deleted — not just the ones respondents happened to pick. Groups
-    // are keyed by label (that's what the filter matches on), so a removed question and
-    // its replacement of the same name share one group.
-    const demoFieldRows = await db
-      .select({
-        fieldOrder: formFields.fieldOrder,
-        label: formFields.fieldLabel,
-        optionLabel: fieldOptions.optionLabel,
-        optionOrder: fieldOptions.optionOrder,
-      })
-      .from(formFields)
-      .leftJoin(fieldOptions, eq(fieldOptions.fieldId, formFields.id))
-      .where(
-        and(
-          eq(formFields.formId, formId),
-          eq(formFields.section, "demographic"),
-          eq(formFields.fieldType, "radio"),
-        ),
-      )
-      .orderBy(formFields.fieldOrder, fieldOptions.optionOrder);
-    const demographicFilters = (() => {
-      const byLabel = new Map<string, Set<string>>();
-      for (const row of demoFieldRows) {
-        const options = byLabel.get(row.label ?? "Question") ?? new Set<string>();
-        if (row.optionLabel) options.add(row.optionLabel);
-        byLabel.set(row.label ?? "Question", options);
-      }
-      return [...byLabel.entries()].map(([label, options]) => ({ label, options: [...options] }));
-    })();
-
-    if (filterEntries.length > 0) {
+    if (isFiltering) {
       for (let i = pointRows.length - 1; i >= 0; i -= 1) {
         if (!matchesDemo(pointRows[i]!.submissionId)) pointRows.splice(i, 1);
       }
@@ -761,6 +781,8 @@ export const analyticsService = {
       rank?: TrendRank;
       topics?: number[];
       timeZone?: string;
+      /** Same demographic filter as the Themes tab — see loadDemographics. */
+      demo?: Record<string, string[]>;
     } = {},
   ): Promise<FormTrend> {
     await assertFormOwner(formId, adminId);
@@ -831,6 +853,7 @@ export const analyticsService = {
         sentiment: points.sentimentLabel,
         severe: points.isSevere,
         submittedAt: submissions.createdAt,
+        submissionId: submissions.id,
       })
       .from(points)
       .innerJoin(answers, eq(points.answerId, answers.id))
@@ -845,9 +868,15 @@ export const analyticsService = {
         ),
       );
 
+    // Demographic filter applies to everything below: series, picker, rising/declining.
+    const { matchesDemo, isFiltering } = opts.demo
+      ? await loadDemographics(formId, opts.demo)
+      : { matchesDemo: () => true, isFiltering: false };
+
     type CleanRow = { topicId: number; sentiment: Sentiment; severe: boolean; t: number };
     const clean: CleanRow[] = [];
     for (const row of rows) {
+      if (isFiltering && !matchesDemo(row.submissionId)) continue;
       const t = parseTs(row.submittedAt as string);
       if (Number.isNaN(t) || row.topicId === null || !isSentiment(row.sentiment)) continue;
       clean.push({ topicId: row.topicId, sentiment: row.sentiment, severe: Boolean(row.severe), t });
