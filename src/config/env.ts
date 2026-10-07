@@ -4,6 +4,12 @@ export const env = {
   DATABASE_URL: Bun.env.DATABASE_URL ?? "",
   NODE_ENV: Bun.env.NODE_ENV ?? "development",
   CLIENT_URL: Bun.env.CLIENT_URL ?? "http://localhost:5173",
+  // Microsoft (Entra ID) sign-in. The client gets an ID token via MSAL and POSTs it
+  // to /auth/microsoft; these must match that app registration. TENANT_ID is a
+  // directory GUID to only accept that tenant, or "organizations" / "common" to
+  // accept any work/school (or personal, for "common") account.
+  MICROSOFT_CLIENT_ID: Bun.env.MICROSOFT_CLIENT_ID ?? "",
+  MICROSOFT_TENANT_ID: Bun.env.MICROSOFT_TENANT_ID ?? "common",
   // Object storage for uploaded assets (form cover images). The bucket is kept
   // private — nothing is ever handed to the browser as a direct MinIO URL, every
   // read goes through the API's own accessType checks (see minio.ts).
