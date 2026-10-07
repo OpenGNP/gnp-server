@@ -4,7 +4,7 @@ import { authController } from "../controllers/authController";
 import { authJwt, toAuthPayload } from "../plugins/jwt";
 import { AUTH_COOKIE_NAME, authCookieOptions } from "../utils/cookies";
 import { successResponse } from "../utils/response";
-import { loginSchema } from "../validators/authValidator";
+import { loginSchema, microsoftLoginSchema } from "../validators/authValidator";
 
 export const authRoutes = new Elysia({ prefix: "/auth" })
   .use(authJwt)
@@ -20,6 +20,23 @@ export const authRoutes = new Elysia({ prefix: "/auth" })
     {
       body: loginSchema,
       detail: { tags: ["Auth"], summary: "Log in with email and password" },
+    },
+  )
+  .post(
+    "/microsoft",
+    async ({ body, jwt, cookie }) => {
+      const user = await authController.loginWithMicrosoft(body);
+      const token = await jwt.sign(toAuthPayload(user));
+      cookie[AUTH_COOKIE_NAME]!.set({ value: token, ...authCookieOptions });
+
+      return successResponse("Logged in successfully", { user, token });
+    },
+    {
+      body: microsoftLoginSchema,
+      detail: {
+        tags: ["Auth"],
+        summary: "Log in with a Microsoft (Entra ID) ID token obtained via MSAL",
+      },
     },
   )
   .post(
