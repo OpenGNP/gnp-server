@@ -68,6 +68,7 @@ export const analyticsController = {
       rank?: string;
       topics?: string;
       tz?: string;
+      demo?: string;
     } = {},
   ) {
     return analyticsService.formTrend(formId, adminId, {
@@ -77,6 +78,7 @@ export const analyticsController = {
       rank: isTrendRank(query.rank) ? query.rank : undefined,
       topics: parseIds(query.topics),
       timeZone: query.tz,
+      demo: parseDemoFilter(query.demo),
     });
   },
 };
