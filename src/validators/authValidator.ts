@@ -7,6 +7,8 @@ export const loginSchema = z.object({
 
 export const microsoftLoginSchema = z.object({
   idToken: z.string().min(1),
+  // Graph `User.Read` token from the same sign-in; only used to name a new organization.
+  accessToken: z.string().min(1).optional(),
 });
 
 export type LoginInput = z.infer<typeof loginSchema>;
