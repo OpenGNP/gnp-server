@@ -23,6 +23,8 @@ export type MicrosoftIdentity = {
   email: string;
   fullName: string | null;
   tenantId: string;
+  /** A personal (outlook.com, hotmail.com, …) account rather than a work/school one. */
+  isPersonalAccount: boolean;
 };
 
 /**
@@ -68,5 +70,6 @@ export async function verifyMicrosoftIdToken(idToken: string): Promise<Microsoft
     email: rawEmail.trim().toLowerCase(),
     fullName: typeof payload.name === "string" && payload.name.trim() ? payload.name.trim() : null,
     tenantId,
+    isPersonalAccount: tenantId === PERSONAL_ACCOUNT_TENANT_ID,
   };
 }
