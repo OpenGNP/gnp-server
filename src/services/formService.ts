@@ -373,6 +373,12 @@ function assertAccessible(
   throw forbidden("You do not have access to this form");
 }
 
+function assertCanUseOrganizationAccess(admin: CurrentUser, accessType: string | undefined) {
+  if (accessType === "organization" && admin.organizationId === null) {
+    throw badRequest("Your account doesn't belong to an organization, so this form can't be limited to one");
+  }
+}
+
 export const formService = {
   async assertOwnership(id: number, adminId: number) {
     await getOwnedForm(id, adminId);
@@ -562,6 +568,8 @@ export const formService = {
   },
 
   async create(admin: CurrentUser, input: CreateFormInput) {
+    assertCanUseOrganizationAccess(admin, input.accessType);
+
     if (input.folderId !== undefined) {
       await assertFolderOwnership(input.folderId, admin.id);
     }
@@ -607,6 +615,7 @@ export const formService = {
   },
 
   async update(id: number, admin: CurrentUser, input: UpdateFormInput) {
+    assertCanUseOrganizationAccess(admin, input.accessType);
     const existing = await getOwnedForm(id, admin.id);
 
     if (input.folderId !== undefined && input.folderId !== null) {
