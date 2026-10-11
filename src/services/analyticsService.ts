@@ -45,6 +45,8 @@ export type ThemeFeedbackPoint = {
   quote: string;
   originalFeedback: string;
   submittedAt: string;
+  /** Index into the topic's `volumeSeries` this point was counted in (null: outside every bucket). */
+  volumeBucket: number | null;
   /** The respondent's answers to the form's demographic (single-choice) questions, in form order. */
   demographics: { label: string; value: string }[];
 };
@@ -741,9 +743,13 @@ export const analyticsService = {
       }
 
       const volumeCounts = volume.starts.map(() => ({ negative: 0, neutral: 0, positive: 0 }));
+      const bucketOfRow = new Map<(typeof rows)[number], number>();
       for (const row of rows) {
         const index = bucketIndexOf(row.submittedAt);
-        if (index >= 0) volumeCounts[index]![row.sentiment as Sentiment] += 1;
+        if (index >= 0) {
+          volumeCounts[index]![row.sentiment as Sentiment] += 1;
+          bucketOfRow.set(row, index);
+        }
       }
 
       // Every point in the topic, not a sample — the panel has its own sort and filter.
@@ -754,6 +760,7 @@ export const analyticsService = {
         quote: row.pointText ?? "",
         originalFeedback: row.originalFeedback ?? row.pointText ?? "",
         submittedAt: row.submittedAt ?? new Date().toISOString(),
+        volumeBucket: bucketOfRow.get(row) ?? null,
         demographics: [...(demoBySubmission.get(row.submissionId) ?? [])]
           .sort((a, b) => a.order - b.order)
           .map((entry) => ({ label: entry.label, value: entry.value || "Unspecified" })),
