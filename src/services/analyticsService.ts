@@ -87,6 +87,11 @@ export type TopicMovement = {
   /** Positive / negative mentions: current window count − previous window count. */
   positiveDelta: number;
   negativeDelta: number;
+  /** The raw counts behind those deltas (for the row's hover detail). */
+  currentPositive: number;
+  previousPositive: number;
+  currentNegative: number;
+  previousNegative: number;
 };
 
 export type TrendBucket = "day" | "week" | "month" | "year";
@@ -111,9 +116,15 @@ export type SentimentCounts = { negative: number; neutral: number; positive: num
 export type TrendTopicSummary = SentimentCounts & { id: string; mentions: number };
 export type TrendSentimentPoint = {
   label: string;
+  /** Share of the period's mentions (%). */
   negative: number;
   neutral: number;
   positive: number;
+  /**
+   * The raw mention counts behind those percentages — a 100% from one mention
+   * reads very differently from 100% of fifty.
+   */
+  counts: { negative: number; neutral: number; positive: number };
 };
 
 export type FormTrend = {
@@ -142,6 +153,8 @@ export type FormTrend = {
   sentimentSeries: TrendSentimentPoint[];
   risingTopics: TopicMovement[];
   decliningTopics: TopicMovement[];
+  /** How a topic qualifies for Rising/Declining — explained by the cards' info tooltip. */
+  movementRule: { minDelta: number; limit: number };
   emergingIssues: { id: string; title: string; description: string; riskLabel: string }[];
   timelineEvents: {
     id: string;
@@ -208,6 +221,8 @@ const MOVE_WORDING: Record<TrendBucket, { last: string; before: string }> = {
 };
 /** Rising needs delta ≥ this; declining delta ≤ −this. */
 const MIN_DELTA = 2;
+/** Rows shown in each of Rising / Declining. */
+const MOVEMENT_LIMIT = 5;
 /** Emerging issue (non-severe): at least this many negatives in the current window. */
 const EMERGING_MIN_NEGATIVE = 3;
 /** Timeline spike: a bucket count ≥ SPIKE_MIN_COUNT and ≥ SPIKE_MIN_ABOVE over the topic's earlier-bucket average. */
@@ -863,6 +878,7 @@ export const analyticsService = {
       sentimentSeries: [],
       risingTopics: [],
       decliningTopics: [],
+      movementRule: { minDelta: MIN_DELTA, limit: MOVEMENT_LIMIT },
       emergingIssues: [],
       timelineEvents: [],
     };
@@ -957,17 +973,21 @@ export const analyticsService = {
         status,
         positiveDelta: c.pos - p.pos,
         negativeDelta: c.neg - p.neg,
+        currentPositive: c.pos,
+        previousPositive: p.pos,
+        currentNegative: c.neg,
+        previousNegative: p.neg,
       };
     });
 
     const risingTopics = movements
       .filter((m) => m.delta >= MIN_DELTA)
       .sort((a, b) => b.delta - a.delta)
-      .slice(0, 5);
+      .slice(0, MOVEMENT_LIMIT);
     const decliningTopics = movements
       .filter((m) => m.delta <= -MIN_DELTA)
       .sort((a, b) => a.delta - b.delta)
-      .slice(0, 5);
+      .slice(0, MOVEMENT_LIMIT);
 
     // --- topic picker: rank every in-window topic ---------------------------
     const rankScore = (id: number): number => {
@@ -1090,11 +1110,12 @@ export const analyticsService = {
 
     const sentimentSeries: TrendSentimentPoint[] = bucketKeys.map((k, i) => {
       const raw = sentimentRaw[i]!;
+      const counts = { negative: raw.negative, neutral: raw.neutral, positive: raw.positive };
       const total = raw.negative + raw.neutral + raw.positive;
-      if (total === 0) return { label: cal.label(k, bkt), negative: 0, neutral: 0, positive: 0 };
+      if (total === 0) return { label: cal.label(k, bkt), negative: 0, neutral: 0, positive: 0, counts };
       const negative = Math.round((raw.negative / total) * 100);
       const neutral = Math.round((raw.neutral / total) * 100);
-      return { label: cal.label(k, bkt), negative, neutral, positive: 100 - negative - neutral };
+      return { label: cal.label(k, bkt), negative, neutral, positive: 100 - negative - neutral, counts };
     });
 
     // Timeline: a topic's count in a bucket that is ≥ SPIKE_MIN_COUNT and at least
@@ -1137,6 +1158,7 @@ export const analyticsService = {
       sentimentSeries,
       risingTopics,
       decliningTopics,
+      movementRule: { minDelta: MIN_DELTA, limit: MOVEMENT_LIMIT },
       emergingIssues,
       timelineEvents,
     };
