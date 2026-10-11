@@ -202,7 +202,7 @@ export const isTrendRank = (v: string | undefined): v is TrendRank =>
 
 /** Default line count when the chart auto-picks; hard cap when the caller picks. */
 const TREND_SERIES_DEFAULT = 3;
-const TREND_SERIES_MAX = 5;
+const TREND_SERIES_MAX = 8;
 /** Rows sent to the picker — beyond this, topics have negligible volume anyway. */
 const TREND_AVAILABLE_LIMIT = 500;
 
