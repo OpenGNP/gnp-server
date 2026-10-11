@@ -2,8 +2,6 @@ import { env } from "../config/env";
 
 export const AUTH_COOKIE_NAME = "auth_token";
 
-/** Seconds; kept in sync with the JWT's `exp` in src/plugins/jwt.ts. */
-export const AUTH_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
 
 /**
  * `secure` is only enabled in production because dev runs over plain http://localhost,
@@ -16,5 +14,11 @@ export const authCookieOptions = {
   secure: env.NODE_ENV === "production",
   sameSite: "lax" as const,
   path: "/",
-  maxAge: AUTH_COOKIE_MAX_AGE,
 };
+
+/** Cookie settings for an auth token that expires in `maxAgeSeconds` (matches the JWT's exp). */
+export const authTokenCookie = (token: string, maxAgeSeconds: number) => ({
+  value: token,
+  ...authCookieOptions,
+  maxAge: maxAgeSeconds,
+});

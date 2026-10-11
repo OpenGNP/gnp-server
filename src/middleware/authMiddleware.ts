@@ -1,7 +1,15 @@
-import { Elysia } from "elysia";
+import { Elysia, type Context } from "elysia";
 
-import { authJwt, type AuthTokenPayload } from "../plugins/jwt";
-import { AUTH_COOKIE_NAME } from "../utils/cookies";
+
+import {
+  authJwt,
+  issueAuthToken,
+  RENEWED_TOKEN_HEADER,
+  shouldRenewAuthToken,
+  tokenAuthTime,
+  type AuthTokenPayload,
+} from "../plugins/jwt";
+import { AUTH_COOKIE_NAME, authTokenCookie } from "../utils/cookies";
 import { unauthorized } from "../utils/errors";
 import { errorResponse } from "../utils/response";
 
@@ -30,15 +38,25 @@ const parsePayload = (payload: Record<string, unknown> | false): CurrentUser | n
   };
 };
 
+type AuthTokenJwt = {
+  verify: (token: string) => Promise<Record<string, unknown> | false>;
+  sign: Parameters<typeof issueAuthToken>[0]["sign"];
+};
+
 /**
  * Prefers an explicit `Authorization: Bearer` header (API clients, mobile apps, the
  * Scalar docs "Authorize" button) and falls back to the httpOnly auth cookie set by
  * /auth/login (browser clients).
+ *
+ * Also renews tokens (plugins/jwt.ts): an active user's token is periodically
+ * swapped for a fresh one — sent back both as the auth cookie and in the
+ * X-Auth-Token header (for Bearer clients, which the web app is).
  */
 async function resolveCurrentUser(
-  jwt: { verify: (token: string) => Promise<Record<string, unknown> | false> },
+  jwt: AuthTokenJwt,
   headers: Record<string, string | undefined>,
-  cookie: Record<string, { value?: unknown }>,
+  cookie: Context["cookie"],
+  set: Context["set"],
 ): Promise<CurrentUser | null> {
   const header = headers.authorization;
   const bearerToken = header?.startsWith("Bearer ") ? header.slice(7) : undefined;
@@ -49,14 +67,26 @@ async function resolveCurrentUser(
   if (!token) return null;
 
   const payload = await jwt.verify(token);
-  return parsePayload(payload);
+  const user = parsePayload(payload);
+
+  if (user && payload && shouldRenewAuthToken(payload)) {
+    const { token: renewed, maxAgeSeconds } = await issueAuthToken(
+      jwt,
+      { sub: String(user.id), email: user.email, role: user.role, organizationId: user.organizationId },
+      tokenAuthTime(payload),
+    );
+    set.headers[RENEWED_TOKEN_HEADER] = renewed;
+    cookie[AUTH_COOKIE_NAME]!.set(authTokenCookie(renewed, maxAgeSeconds));
+  }
+
+  return user;
 }
 
 /** Derives `currentUser` (nullable) from a Bearer token or the auth cookie. Never rejects the request. */
 export const optionalAuth = new Elysia({ name: "optional-auth" })
   .use(authJwt)
-  .derive({ as: "scoped" }, async ({ jwt, headers, cookie }) => ({
-    currentUser: await resolveCurrentUser(jwt, headers, cookie),
+  .derive({ as: "scoped" }, async ({ jwt, headers, cookie, set }) => ({
+    currentUser: await resolveCurrentUser(jwt, headers, cookie, set),
   }));
 
 /**
@@ -69,8 +99,8 @@ export const optionalAuth = new Elysia({ name: "optional-auth" })
 function buildGuard(name: string, allowedRoles?: string[]) {
   return new Elysia({ name })
     .use(authJwt)
-    .derive({ as: "scoped" }, async ({ jwt, headers, cookie }) => ({
-      currentUser: await resolveCurrentUser(jwt, headers, cookie),
+    .derive({ as: "scoped" }, async ({ jwt, headers, cookie, set }) => ({
+      currentUser: await resolveCurrentUser(jwt, headers, cookie, set),
     }))
     .onBeforeHandle({ as: "scoped" }, ({ currentUser, status }) => {
       if (!currentUser) {

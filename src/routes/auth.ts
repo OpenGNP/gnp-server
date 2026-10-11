@@ -1,8 +1,8 @@
 import { Elysia } from "elysia";
 
 import { authController } from "../controllers/authController";
-import { authJwt, toAuthPayload } from "../plugins/jwt";
-import { AUTH_COOKIE_NAME, authCookieOptions } from "../utils/cookies";
+import { authJwt, issueAuthToken, toAuthPayload } from "../plugins/jwt";
+import { AUTH_COOKIE_NAME, authTokenCookie } from "../utils/cookies";
 import { successResponse } from "../utils/response";
 import { loginSchema, microsoftLoginSchema } from "../validators/authValidator";
 
@@ -12,8 +12,8 @@ export const authRoutes = new Elysia({ prefix: "/auth" })
     "/login",
     async ({ body, jwt, cookie }) => {
       const user = await authController.login(body);
-      const token = await jwt.sign(toAuthPayload(user));
-      cookie[AUTH_COOKIE_NAME]!.set({ value: token, ...authCookieOptions });
+      const { token, maxAgeSeconds } = await issueAuthToken(jwt, toAuthPayload(user));
+      cookie[AUTH_COOKIE_NAME]!.set(authTokenCookie(token, maxAgeSeconds));
 
       return successResponse("Logged in successfully", { user, token });
     },
@@ -26,8 +26,8 @@ export const authRoutes = new Elysia({ prefix: "/auth" })
     "/microsoft",
     async ({ body, jwt, cookie }) => {
       const user = await authController.loginWithMicrosoft(body);
-      const token = await jwt.sign(toAuthPayload(user));
-      cookie[AUTH_COOKIE_NAME]!.set({ value: token, ...authCookieOptions });
+      const { token, maxAgeSeconds } = await issueAuthToken(jwt, toAuthPayload(user));
+      cookie[AUTH_COOKIE_NAME]!.set(authTokenCookie(token, maxAgeSeconds));
 
       return successResponse("Logged in successfully", { user, token });
     },

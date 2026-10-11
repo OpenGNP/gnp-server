@@ -18,7 +18,9 @@ import { loggerMiddleware } from "./middleware/loggerMiddleware";
 import { apiDocs } from "./plugins/openapi";
 
 const app = new Elysia()
-  .use(cors({ origin: env.CLIENT_URL, credentials: true }))
+  // X-Auth-Token carries renewed auth tokens (plugins/jwt.ts) — exposed so the
+  // cross-origin dev client (localhost:5173 → :3000) can read it.
+  .use(cors({ origin: env.CLIENT_URL, credentials: true, exposeHeaders: ["X-Auth-Token"] }))
   .use(loggerMiddleware)
   .use(errorMiddleware)
   .use(apiDocs)
