@@ -66,12 +66,9 @@ export type ThemeTopic = {
   volumeSeries: ThemeVolumePoint[];
 };
 
-/** The Trend tab's auto-bucketed charts get 6–12 x-axis points. */
-const TREND_POINTS_MIN = 6;
-const TREND_POINTS_MAX = 12;
-/** The topic panel's volume chart gets 4–8 x-axis points. */
-const THEME_VOLUME_MIN_POINTS = 4;
-const THEME_VOLUME_MAX_POINTS = 8;
+/** Dashboard auto-bucketed charts get 6–12 x-axis points. */
+const POINTS_MIN = 6;
+const POINTS_MAX = 12;
 
 export type TopicMovementStatus = "existing" | "new" | "inactive";
 
@@ -180,8 +177,8 @@ export const isTrendRank = (v: string | undefined): v is TrendRank =>
   v !== undefined && (TREND_RANKS as readonly string[]).includes(v);
 
 /** Default line count when the chart auto-picks; hard cap when the caller picks. */
-const TREND_SERIES_DEFAULT = 5;
-const TREND_SERIES_MAX = 8;
+const TREND_SERIES_DEFAULT = 3;
+const TREND_SERIES_MAX = 5;
 /** Rows sent to the picker — beyond this, topics have negligible volume anyway. */
 const TREND_AVAILABLE_LIMIT = 500;
 
@@ -691,7 +688,7 @@ export const analyticsService = {
         : [];
     const metaById = new Map(topicMeta.map((meta) => [meta.id, meta]));
 
-    const volume = volumeBuckets(cal, from, to, THEME_VOLUME_MIN_POINTS, THEME_VOLUME_MAX_POINTS);
+    const volume = volumeBuckets(cal, from, to, POINTS_MIN, POINTS_MAX);
     const bucketIndexOf = (iso: string | null) => {
       const t = iso ? parseTs(iso) : NaN;
       if (Number.isNaN(t)) return -1;
@@ -825,7 +822,7 @@ export const analyticsService = {
     // No explicit bucket = "auto": pick a step that gives the charts 6–12 x-axis points
     // (it can span several units, e.g. 2 weeks). `bkt` is then that step's unit, which
     // the rising/declining comparison below keeps using.
-    const autoVolume = opts.bucket ? null : volumeBuckets(cal, from, to, TREND_POINTS_MIN, TREND_POINTS_MAX);
+    const autoVolume = opts.bucket ? null : volumeBuckets(cal, from, to, POINTS_MIN, POINTS_MAX);
     const bkt: TrendBucket = opts.bucket ?? autoVolume!.bucket;
     const rank: TrendRank = opts.rank ?? "mentioned";
     // Rising / Declining + Emerging Issues: current = (to − N, to], previous = the N
