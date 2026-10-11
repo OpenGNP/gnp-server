@@ -105,6 +105,10 @@ export type TrendAvailableTopic = {
 };
 
 export type TrendVolumePoint = Record<string, number | string>;
+/** Raw mention counts by sentiment (not percentages). */
+export type SentimentCounts = { negative: number; neutral: number; positive: number };
+/** One charted topic over the whole selected window. */
+export type TrendTopicSummary = SentimentCounts & { id: string; mentions: number };
 export type TrendSentimentPoint = {
   label: string;
   negative: number;
@@ -128,6 +132,13 @@ export type FormTrend = {
   /** Every topic in the window, ranked by `rank` — powers the topic picker. */
   availableTopics: TrendAvailableTopic[];
   volumeSeries: TrendVolumePoint[];
+  /**
+   * Per charted topic (keyed by id): sentiment counts for each bucket, index-aligned
+   * with `volumeSeries` — the Topic Trends side panel's per-period breakdown.
+   */
+  topicSentimentSeries: Record<string, SentimentCounts[]>;
+  /** Per charted topic: mentions + sentiment over the whole window (side panel default). */
+  topicSummaries: TrendTopicSummary[];
   sentimentSeries: TrendSentimentPoint[];
   risingTopics: TopicMovement[];
   decliningTopics: TopicMovement[];
@@ -847,6 +858,8 @@ export const analyticsService = {
       topicVolumeSeries: [],
       availableTopics: [],
       volumeSeries: [],
+      topicSentimentSeries: {},
+      topicSummaries: [],
       sentimentSeries: [],
       risingTopics: [],
       decliningTopics: [],
@@ -1043,6 +1056,10 @@ export const analyticsService = {
     });
     const sentimentRaw = bucketKeys.map(() => ({ negative: 0, neutral: 0, positive: 0 }));
     const bucketTopicCounts = bucketKeys.map(() => new Map<number, number>());
+    const topicSentimentSeries: Record<string, SentimentCounts[]> = {};
+    for (const id of seriesIds) {
+      topicSentimentSeries[String(id)] = bucketKeys.map(() => ({ negative: 0, neutral: 0, positive: 0 }));
+    }
 
     for (const r of current) {
       const i = idxFor(r.t);
@@ -1052,8 +1069,24 @@ export const analyticsService = {
       if (seriesIds.has(r.topicId)) {
         const key = String(r.topicId);
         volumeSeries[i]![key] = ((volumeSeries[i]![key] as number) ?? 0) + 1;
+        topicSentimentSeries[key]![i]![r.sentiment] += 1;
       }
     }
+
+    // Window totals per charted topic, summed from the per-bucket counts above.
+    const topicSummaries: TrendTopicSummary[] = selectedIds.map((id) => {
+      const totals = { negative: 0, neutral: 0, positive: 0 };
+      for (const bucket of topicSentimentSeries[String(id)] ?? []) {
+        totals.negative += bucket.negative;
+        totals.neutral += bucket.neutral;
+        totals.positive += bucket.positive;
+      }
+      return {
+        id: String(id),
+        mentions: totals.negative + totals.neutral + totals.positive,
+        ...totals,
+      };
+    });
 
     const sentimentSeries: TrendSentimentPoint[] = bucketKeys.map((k, i) => {
       const raw = sentimentRaw[i]!;
@@ -1099,6 +1132,8 @@ export const analyticsService = {
       topicVolumeSeries,
       availableTopics,
       volumeSeries,
+      topicSentimentSeries,
+      topicSummaries,
       sentimentSeries,
       risingTopics,
       decliningTopics,

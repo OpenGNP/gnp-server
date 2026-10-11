@@ -35,8 +35,6 @@ const db = drizzle(client);
 const FORM_TITLE = "SIT Student Experience Survey 2026";
 const DAY_MS = 24 * 60 * 60 * 1000;
 const daysAgo = (n: number) => new Date(Date.now() - n * DAY_MS).toISOString();
-const slugify = (s: string) =>
-  s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 
 async function one<T>(rows: Promise<T[]>): Promise<T> {
   const [row] = await rows;
@@ -390,7 +388,6 @@ async function main() {
         recordName: false,
         oneResponsePerPerson: true,
         publishedAt: daysAgo(startDaysAgo),
-        slug: slugify(FORM_TITLE),
         sortOrder: 10,
         startDate: daysAgo(startDaysAgo),
         endDate: daysAgo(-30), // closes 30 days from now
