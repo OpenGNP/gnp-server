@@ -9,6 +9,7 @@ import {
   forms,
   points,
   submissions,
+  users,
 } from "../db/client";
 import { forbidden, notFound } from "../utils/errors";
 import { parseDbTimestamp } from "../utils/timestamp";
@@ -31,7 +32,17 @@ export type FieldBreakdown =
       totalRespondents: number;
       options: { id: string; label: string; value: number }[];
     }
-  | { kind: "text"; id: string; title: string; responses: string[] };
+  | { kind: "text"; id: string; title: string; responses: TextResponse[] };
+
+/** A free-text answer, with who wrote it when the form recorded names (null: anonymous). */
+export type TextResponse = { text: string; respondentName: string | null };
+
+/**
+ * The respondent's name for a submission joined to `users` (left join on
+ * `submissions.userId`). Only set when the form had `recordName` on at submit time and
+ * the respondent was signed in — anonymous submissions never store a user, so stay null.
+ */
+const respondentNameSql = sql<string | null>`coalesce(nullif(${submissions.respondentName}, ''), nullif(${users.fullName}, ''), ${users.email})`;
 
 type Sentiment = "negative" | "neutral" | "positive";
 
@@ -45,6 +56,8 @@ export type ThemeFeedbackPoint = {
   quote: string;
   originalFeedback: string;
   submittedAt: string;
+  /** Who wrote it, when the form recorded names; null for anonymous submissions. */
+  respondentName: string | null;
   /** Index into the topic's `volumeSeries` this point was counted in (null: outside every bucket). */
   volumeBucket: number | null;
   /** The respondent's answers to the form's demographic (single-choice) questions, in form order. */
@@ -542,9 +555,10 @@ export const analyticsService = {
 
     // Free-text answers, newest first.
     const textRows = await db
-      .select({ fieldId: answers.fieldId, text: answers.answerText })
+      .select({ fieldId: answers.fieldId, text: answers.answerText, respondentName: respondentNameSql })
       .from(answers)
       .innerJoin(submissions, eq(answers.submissionId, submissions.id))
+      .leftJoin(users, eq(submissions.userId, users.id))
       .where(and(eq(submissions.formId, formId), isNotNull(answers.answerText)))
       .orderBy(desc(answers.createdAt));
 
@@ -583,7 +597,7 @@ export const analyticsService = {
           title,
           responses: textRows
             .filter((row) => row.fieldId === field.id && row.text && row.text.trim() !== "")
-            .map((row) => row.text as string),
+            .map((row) => ({ text: row.text as string, respondentName: row.respondentName ?? null })),
         };
       }
 
@@ -655,10 +669,12 @@ export const analyticsService = {
         originalFeedback: answers.answerText,
         submissionId: submissions.id,
         submittedAt: submissions.createdAt,
+        respondentName: respondentNameSql,
       })
       .from(points)
       .innerJoin(answers, eq(points.answerId, answers.id))
       .innerJoin(submissions, eq(answers.submissionId, submissions.id))
+      .leftJoin(users, eq(submissions.userId, users.id))
       .where(and(eq(submissions.formId, formId), inWindow))
       .orderBy(desc(submissions.createdAt));
 
@@ -760,6 +776,7 @@ export const analyticsService = {
         quote: row.pointText ?? "",
         originalFeedback: row.originalFeedback ?? row.pointText ?? "",
         submittedAt: row.submittedAt ?? new Date().toISOString(),
+        respondentName: row.respondentName ?? null,
         volumeBucket: bucketOfRow.get(row) ?? null,
         demographics: [...(demoBySubmission.get(row.submissionId) ?? [])]
           .sort((a, b) => a.order - b.order)
