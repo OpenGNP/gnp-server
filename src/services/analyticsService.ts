@@ -49,7 +49,14 @@ export type ThemeFeedbackPoint = {
   demographics: { label: string; value: string }[];
 };
 
-export type ThemeVolumePoint = { label: string; value: number };
+/** One bucket of a topic's volume: total mentions plus their sentiment split. */
+export type ThemeVolumePoint = {
+  label: string;
+  value: number;
+  negative: number;
+  neutral: number;
+  positive: number;
+};
 
 export type ThemeTopic = {
   id: string;
@@ -733,10 +740,10 @@ export const analyticsService = {
         if (row.severe) severe += 1;
       }
 
-      const volumeCounts = volume.starts.map(() => 0);
+      const volumeCounts = volume.starts.map(() => ({ negative: 0, neutral: 0, positive: 0 }));
       for (const row of rows) {
         const index = bucketIndexOf(row.submittedAt);
-        if (index >= 0) volumeCounts[index]! += 1;
+        if (index >= 0) volumeCounts[index]![row.sentiment as Sentiment] += 1;
       }
 
       // Every point in the topic, not a sample — the panel has its own sort and filter.
@@ -763,10 +770,14 @@ export const analyticsService = {
         aiSummary: meta?.summary ?? "",
         keywords: parseKeywords(meta?.keywords ?? null),
         feedbackSegment,
-        volumeSeries: volume.starts.map((start, i) => ({
-          label: cal.label(start, volume.bucket),
-          value: volumeCounts[i]!,
-        })),
+        volumeSeries: volume.starts.map((start, i) => {
+          const bucket = volumeCounts[i]!;
+          return {
+            label: cal.label(start, volume.bucket),
+            value: bucket.negative + bucket.neutral + bucket.positive,
+            ...bucket,
+          };
+        }),
       };
     });
 
