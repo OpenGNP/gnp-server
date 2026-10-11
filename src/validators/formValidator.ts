@@ -55,7 +55,7 @@ export const createFormSchema = z.object({
   startDate: dateStringSchema.optional(),
   endDate: dateStringSchema.optional(),
   fields: z.array(formFieldSchema).default([]),
-  allowedEmails: z.array(z.email()).optional(),
+  allowedEmails: z.array(z.email().trim().toLowerCase()).optional(),
 });
 
 // NOTE: update schemas are defined independently (not `.partial()` off the
@@ -83,7 +83,7 @@ export const updateFormSchema = z.object({
   startDate: nullableDateStringSchema.optional(),
   endDate: nullableDateStringSchema.optional(),
   fields: z.array(formFieldSchema).optional(),
-  allowedEmails: z.array(z.email()).optional(),
+  allowedEmails: z.array(z.email().trim().toLowerCase()).optional(),
 });
 
 export const createFormFieldSchema = formFieldSchema;

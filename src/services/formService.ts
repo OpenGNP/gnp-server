@@ -1,4 +1,4 @@
-import { and, count, desc, eq, inArray, isNull, max, or, type SQL } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNull, max, or, sql, type SQL } from "drizzle-orm";
 
 import { db, fieldOptions, folders, formAllowedUsers, formFields, forms, submissions, users } from "../db/client";
 import { contentTypeForKey, extensionForMimeType, getObjectBuffer, putObject, removeObjectSafely } from "../lib/minio";
@@ -277,19 +277,27 @@ async function getOptionOrThrow(optionId: number, fieldId: number) {
   return option;
 }
 
-async function syncAllowedUsers(tx: Tx, formId: number, organizationId: number | null, emails: string[]) {
+/**
+ * Replaces a "specific" form's invite list. Every email is stored as typed
+ * (lowercased) — invitees don't need an account yet; access is checked against the
+ * viewer's email at open time (see assertAccessible). `userId` is filled in where
+ * an account already exists, purely as a convenience link.
+ */
+async function syncAllowedUsers(tx: Tx, formId: number, emails: string[]) {
   await tx.delete(formAllowedUsers).where(eq(formAllowedUsers.formId, formId));
 
-  if (emails.length === 0 || organizationId === null) return;
+  const uniqueEmails = [...new Set(emails.map((email) => email.trim().toLowerCase()))];
+  if (uniqueEmails.length === 0) return;
 
-  const matchedUsers = await tx
-    .select({ id: users.id })
+  const existingUsers = await tx
+    .select({ id: users.id, email: users.email })
     .from(users)
-    .where(and(eq(users.organizationId, organizationId), inArray(users.email, emails)));
+    .where(inArray(sql`lower(${users.email})`, uniqueEmails));
+  const userIdByEmail = new Map(existingUsers.map((user) => [user.email.toLowerCase(), user.id]));
 
-  if (matchedUsers.length === 0) return;
-
-  await tx.insert(formAllowedUsers).values(matchedUsers.map((user) => ({ formId, userId: user.id })));
+  await tx.insert(formAllowedUsers).values(
+    uniqueEmails.map((email) => ({ formId, email, userId: userIdByEmail.get(email) ?? null })),
+  );
 }
 
 async function loadFormForViewer(where: SQL) {
@@ -307,7 +315,7 @@ async function loadFormForViewer(where: SQL) {
         },
       },
       formAllowedUsers: {
-        columns: { userId: true },
+        columns: { email: true },
       },
     },
   });
@@ -347,7 +355,12 @@ async function syncExpiredAcceptingResponses<
 }
 
 function assertAccessible(
-  form: { accessType: string | null; organizationId: number | null; formAllowedUsers: { userId: number }[] },
+  form: {
+    adminId: number;
+    accessType: string | null;
+    organizationId: number | null;
+    formAllowedUsers: { email: string }[];
+  },
   viewer: CurrentUser | null,
 ) {
   const accessType = form.accessType ?? "organization";
@@ -355,6 +368,10 @@ function assertAccessible(
   if (accessType === "public") return;
 
   if (!viewer) throw unauthorized("Sign in required to access this form");
+
+  // The owner always gets through, whatever the audience is set to — e.g. a
+  // "specific" list that doesn't include their own email.
+  if (viewer.id === form.adminId) return;
 
   if (accessType === "organization") {
     if (viewer.organizationId === null || viewer.organizationId !== form.organizationId) {
@@ -364,7 +381,8 @@ function assertAccessible(
   }
 
   if (accessType === "specific") {
-    const allowed = form.formAllowedUsers.some((entry) => entry.userId === viewer.id);
+    const viewerEmail = viewer.email.toLowerCase();
+    const allowed = form.formAllowedUsers.some((entry) => entry.email.toLowerCase() === viewerEmail);
     if (!allowed) throw forbidden("You do not have access to this form");
     return;
   }
@@ -427,11 +445,8 @@ export const formService = {
           },
         },
         formAllowedUsers: {
-          with: {
-            user: {
-              columns: { id: true, fullName: true, email: true },
-            },
-          },
+          columns: { email: true, userId: true },
+          orderBy: (allowed, { asc }) => [asc(allowed.id)],
         },
       },
     });
@@ -607,7 +622,7 @@ export const formService = {
       await insertFields(tx, form!.id, input.fields);
 
       if (input.accessType === "specific" && input.allowedEmails?.length) {
-        await syncAllowedUsers(tx, form!.id, admin.organizationId, input.allowedEmails);
+        await syncAllowedUsers(tx, form!.id, input.allowedEmails);
       }
 
       return form!;
@@ -661,7 +676,7 @@ export const formService = {
       }
 
       if (allowedEmails) {
-        await syncAllowedUsers(tx, id, admin.organizationId, allowedEmails);
+        await syncAllowedUsers(tx, id, allowedEmails);
       }
 
       return updated;

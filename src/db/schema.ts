@@ -30,26 +30,6 @@ export const users = pgTable("users", {
 	check("chk_role", sql`(role)::text = ANY ((ARRAY['user'::character varying, 'staff'::character varying, 'admin'::character varying, 'superadmin'::character varying])::text[])`),
 ]);
 
-export const formAllowedUsers = pgTable("form_allowed_users", {
-	id: serial().notNull(),
-	formId: integer("form_id").notNull(),
-	userId: integer("user_id").notNull(),
-	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).default(sql`CURRENT_TIMESTAMP`),
-	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).default(sql`CURRENT_TIMESTAMP`).notNull(),
-}, (table) => [
-	index("idx_form_allowed_users_user_id").using("btree", table.userId.asc().nullsLast().op("int4_ops")),
-	foreignKey({
-			columns: [table.formId],
-			foreignColumns: [forms.id],
-			name: "fk_allowed_form"
-		}).onDelete("cascade"),
-	foreignKey({
-			columns: [table.userId],
-			foreignColumns: [users.id],
-			name: "fk_allowed_user"
-		}).onDelete("cascade"),
-]);
-
 export const formFields = pgTable("form_fields", {
 	id: serial().notNull(),
 	formId: integer("form_id").notNull(),
@@ -304,5 +284,25 @@ export const aiModelRuns = pgTable("ai_model_runs", {
 			columns: [table.formId],
 			foreignColumns: [forms.id],
 			name: "fk_model_run_form"
+		}).onDelete("cascade"),
+]);
+
+export const formAllowedUsers = pgTable("form_allowed_users", {
+	id: serial().notNull(),
+	formId: integer("form_id").notNull(),
+	userId: integer("user_id"),
+	email: varchar({ length: 255 }).notNull(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).default(sql`CURRENT_TIMESTAMP`),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).default(sql`CURRENT_TIMESTAMP`).notNull(),
+}, (table) => [
+	foreignKey({
+			columns: [table.formId],
+			foreignColumns: [forms.id],
+			name: "fk_allowed_form"
+		}).onDelete("cascade"),
+	foreignKey({
+			columns: [table.userId],
+			foreignColumns: [users.id],
+			name: "fk_allowed_user"
 		}).onDelete("cascade"),
 ]);
