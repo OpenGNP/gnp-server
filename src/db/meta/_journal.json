@@ -15,6 +15,13 @@
       "when": 1791686182461,
       "tag": "0001_medical_whirlwind",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791724562228,
+      "tag": "0002_cynical_proudstar",
+      "breakpoints": true
     }
   ]
 }

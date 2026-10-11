@@ -22,9 +22,6 @@ export const formController = {
     return formService.getPublicByToken(token, viewer, deviceId);
   },
 
-  getPublicBySlug(slug: string, viewer: CurrentUser | null, deviceId?: string) {
-    return formService.getPublicBySlug(slug, viewer, deviceId);
-  },
 
   getCoverImageForEdit(id: number, adminId: number) {
     return formService.getCoverImageForEdit(id, adminId);
@@ -34,9 +31,6 @@ export const formController = {
     return formService.getCoverImageByToken(token, viewer);
   },
 
-  getCoverImageBySlug(slug: string, viewer: CurrentUser | null) {
-    return formService.getCoverImageBySlug(slug, viewer);
-  },
 
   uploadCoverImage(id: number, adminId: number, input: UploadCoverImageInput) {
     return formService.uploadCoverImage(id, adminId, input);

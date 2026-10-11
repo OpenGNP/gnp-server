@@ -52,24 +52,6 @@ const publicFormRoutes = new Elysia()
     },
   )
   .get(
-    "/slug/:slug",
-    async ({ params, query, currentUser }) => {
-      const deviceId = typeof query.deviceId === "string" ? query.deviceId : undefined;
-      const data = await formController.getPublicBySlug(params.slug, currentUser, deviceId);
-      return successResponse("Form loaded successfully", data);
-    },
-    {
-      detail: {
-        tags,
-        summary: "Get the respondent-facing view of a form by its human-readable slug",
-        description:
-          "Used for shareable `/form/{slug}` links. Enforces status, accessType, and the form's " +
-          "start/end date window, in addition to the same optional-Bearer access checks and " +
-          "`deviceId` query param as the public-token endpoint.",
-      },
-    },
-  )
-  .get(
     "/public/:token/cover-image",
     async ({ params, currentUser }) => {
       const image = await formController.getCoverImageByToken(params.token, currentUser);
@@ -82,20 +64,6 @@ const publicFormRoutes = new Elysia()
         description:
           "Same accessType gate as GET /public/:token — the raw image bytes, not the JSON envelope. " +
           "404 if the form has no cover set.",
-      },
-    },
-  )
-  .get(
-    "/slug/:slug/cover-image",
-    async ({ params, currentUser }) => {
-      const image = await formController.getCoverImageBySlug(params.slug, currentUser);
-      return coverImageResponse(image);
-    },
-    {
-      detail: {
-        tags,
-        summary: "Get a form's cover image by slug",
-        description: "Same accessType gate as GET /slug/:slug.",
       },
     },
   );

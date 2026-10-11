@@ -91,7 +91,6 @@ export const forms = pgTable("forms", {
 	acceptingResponses: boolean("accepting_responses").default(true).notNull(),
 	publishedAt: timestamp("published_at", { withTimezone: true, mode: 'string' }),
 	publicToken: uuid("public_token").defaultRandom().notNull(),
-	slug: varchar({ length: 255 }),
 	accessType: varchar("access_type", { length: 30 }).default('organization').notNull(),
 	recordName: boolean("record_name").default(false),
 	oneResponsePerPerson: boolean("one_response_per_person").default(false),

@@ -484,37 +484,6 @@ export const formService = {
     };
   },
 
-  /**
-   * Respondent-facing view, looked up by the form's human-readable `slug` so it can be
-   * shared as `/form/{slug}`. Same status/access rules as `getPublicByToken`, plus the
-   * start/end date window — a slug link only resolves while the form is actually open.
-   */
-  async getPublicBySlug(slug: string, viewer: CurrentUser | null, deviceId?: string) {
-    const form = await loadFormForViewer(eq(forms.slug, slug));
-
-    if (form.status !== "active") throw notFound("Form not found");
-    assertAccessible(form, viewer);
-    assertWithinResponseWindow(form);
-
-    const alreadyResponded = await checkAlreadyResponded(form, viewer, deviceId);
-
-    return {
-      id: form.id,
-      formTitle: form.formTitle,
-      formDescription: form.formDescription,
-      coverImageUrl: form.coverImageUrl,
-      accessType: form.accessType,
-      acceptingResponses: form.acceptingResponses,
-      recordName: form.recordName,
-      oneResponsePerPerson: form.oneResponsePerPerson,
-      alreadyResponded,
-      startDate: form.startDate,
-      endDate: form.endDate,
-      updatedAt: form.updatedAt,
-      fields: form.formFields,
-    };
-  },
-
   /** Same access rules as `getPublicByToken`, plus the accepting-responses window. Used by submission intake. */
   async getFormForSubmission(id: number, viewer: CurrentUser | null) {
     const form = await loadFormForViewer(eq(forms.id, id));
@@ -545,13 +514,6 @@ export const formService = {
     return fetchCoverImage(form.coverImageUrl);
   },
 
-  /** Same accessType gate as getPublicBySlug. */
-  async getCoverImageBySlug(slug: string, viewer: CurrentUser | null) {
-    const form = await loadFormForViewer(eq(forms.slug, slug));
-    if (form.status !== "active") throw notFound("Form not found");
-    assertAccessible(form, viewer);
-    return fetchCoverImage(form.coverImageUrl);
-  },
 
   /** Uploads a new cover to MinIO, points the form at it, and deletes the old object (if any). */
   async uploadCoverImage(id: number, adminId: number, input: UploadCoverImageInput) {
