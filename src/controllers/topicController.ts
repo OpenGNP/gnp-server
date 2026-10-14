@@ -1,5 +1,4 @@
 import { topicService } from "../services/topicService";
-import type { CreateTopicInput } from "../validators/topicValidator";
 
 export const topicController = {
   list() {
@@ -8,9 +7,5 @@ export const topicController = {
 
   get(id: number) {
     return topicService.getById(id);
-  },
-
-  create(input: CreateTopicInput) {
-    return topicService.create(input);
   },
 };

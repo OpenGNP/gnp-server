@@ -2,7 +2,6 @@ import { count, desc, eq, sql } from "drizzle-orm";
 
 import { canonicalTopics, db, points } from "../db/client";
 import { notFound } from "../utils/errors";
-import type { CreateTopicInput } from "../validators/topicValidator";
 
 export const topicService = {
   async list() {
@@ -45,24 +44,5 @@ export const topicService = {
       .limit(20);
 
     return { ...topic, trends, samplePoints };
-  },
-
-  async create(input: CreateTopicInput) {
-    const now = new Date().toISOString();
-
-    const [topic] = await db
-      .insert(canonicalTopics)
-      .values({
-        canonicalName: input.canonicalName,
-        canonicalSummary: input.canonicalSummary,
-        representativeKeywords: input.representativeKeywords,
-        topicSize: 0,
-        status: "active",
-        firstDetectedAt: now,
-        lastUpdatedAt: now,
-      })
-      .returning();
-
-    return topic!;
   },
 };
