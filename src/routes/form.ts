@@ -94,6 +94,24 @@ const adminFormRoutes = new Elysia()
     },
   )
   .get(
+    "/ref/:ref",
+    async ({ params, currentUser }) => {
+      assertCurrentUser(currentUser);
+      const data = await formController.resolveRef(params.ref, currentUser.id);
+      return successResponse("Form reference resolved", data);
+    },
+    {
+      detail: {
+        tags,
+        security,
+        summary: "Resolve a form reference from an app URL to its ids",
+        description:
+          "`ref` is the form's urlId (what the app's /forms/:ref URLs use) or, for links made " +
+          "before urlId existed, its numeric id. Returns { id, urlId }; 404/403 like GET /:id.",
+      },
+    },
+  )
+  .get(
     "/:id",
     async ({ params, currentUser }) => {
       assertCurrentUser(currentUser);

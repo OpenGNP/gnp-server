@@ -6,6 +6,7 @@ import type { CurrentUser } from "../middleware/authMiddleware";
 import { badRequest, forbidden, notFound, unauthorized } from "../utils/errors";
 import { anonymousIdentityCode } from "../utils/helper";
 import { parseDbTimestamp } from "../utils/timestamp";
+import { requireFormAccess } from "./formAccess";
 import type {
   CreateFieldOptionInput,
   CreateFormFieldInput,
@@ -178,15 +179,6 @@ async function hasSubmissions(formId: number) {
     .from(submissions)
     .where(eq(submissions.formId, formId));
   return (row?.value ?? 0) > 0;
-}
-
-async function getOwnedForm(id: number, adminId: number) {
-  const [form] = await db.select().from(forms).where(eq(forms.id, id)).limit(1);
-
-  if (!form) throw notFound("Form not found");
-  if (form.adminId !== adminId) throw forbidden("You do not have access to this form");
-
-  return form;
 }
 
 /**
@@ -398,9 +390,6 @@ function assertCanUseOrganizationAccess(admin: CurrentUser, accessType: string |
 }
 
 export const formService = {
-  async assertOwnership(id: number, adminId: number) {
-    await getOwnedForm(id, adminId);
-  },
 
   async listByAdmin(adminId: number, folderId?: number) {
     const conditions = [eq(forms.adminId, adminId)];
@@ -409,6 +398,7 @@ export const formService = {
     return db
       .select({
         id: forms.id,
+        urlId: forms.urlId,
         formTitle: forms.formTitle,
         formDescription: forms.formDescription,
         status: forms.status,
@@ -429,7 +419,7 @@ export const formService = {
   },
 
   async getForEdit(id: number, adminId: number) {
-    await getOwnedForm(id, adminId);
+    await requireFormAccess(id, adminId, "view");
 
     const form = await db.query.forms.findFirst({
       where: eq(forms.id, id),
@@ -502,7 +492,7 @@ export const formService = {
 
   /** Owner-only — the editor's own preview of the cover it's currently set to. */
   async getCoverImageForEdit(id: number, adminId: number) {
-    const form = await getOwnedForm(id, adminId);
+    const form = await requireFormAccess(id, adminId, "view");
     return fetchCoverImage(form.coverImageUrl);
   },
 
@@ -517,7 +507,7 @@ export const formService = {
 
   /** Uploads a new cover to MinIO, points the form at it, and deletes the old object (if any). */
   async uploadCoverImage(id: number, adminId: number, input: UploadCoverImageInput) {
-    const form = await getOwnedForm(id, adminId);
+    const form = await requireFormAccess(id, adminId, "edit");
 
     const ext = extensionForMimeType(input.file.type) ?? "bin";
     const key = `covers/${id}/${Date.now()}-${crypto.randomUUID()}.${ext}`;
@@ -535,7 +525,7 @@ export const formService = {
 
   /** Clears the form's cover and deletes the underlying object (if any). */
   async removeCoverImage(id: number, adminId: number) {
-    const form = await getOwnedForm(id, adminId);
+    const form = await requireFormAccess(id, adminId, "edit");
 
     if (isManagedCoverKey(form.coverImageUrl)) {
       await removeObjectSafely(form.coverImageUrl);
@@ -593,7 +583,7 @@ export const formService = {
 
   async update(id: number, admin: CurrentUser, input: UpdateFormInput) {
     assertCanUseOrganizationAccess(admin, input.accessType);
-    const existing = await getOwnedForm(id, admin.id);
+    const existing = await requireFormAccess(id, admin.id, "edit");
 
     if (input.folderId !== undefined && input.folderId !== null) {
       await assertFolderOwnership(input.folderId, admin.id);
@@ -646,7 +636,7 @@ export const formService = {
   },
 
   async remove(id: number, adminId: number) {
-    const form = await getOwnedForm(id, adminId);
+    const form = await requireFormAccess(id, adminId, "manage");
     await db.delete(forms).where(eq(forms.id, id));
 
     // Deleting the row doesn't delete the object it pointed at — clean it up so a
@@ -657,7 +647,7 @@ export const formService = {
   },
 
   async addField(formId: number, adminId: number, input: CreateFormFieldInput) {
-    await getOwnedForm(formId, adminId);
+    await requireFormAccess(formId, adminId, "edit");
 
     const field = await db.transaction(async (tx) => {
       const [current] = await tx
@@ -698,7 +688,7 @@ export const formService = {
   },
 
   async updateField(formId: number, fieldId: number, adminId: number, input: UpdateFormFieldInput) {
-    await getOwnedForm(formId, adminId);
+    await requireFormAccess(formId, adminId, "edit");
     await getFieldOrThrow(fieldId, formId);
 
     if (Object.keys(input).length === 0) {
@@ -712,7 +702,7 @@ export const formService = {
   },
 
   async removeField(formId: number, fieldId: number, adminId: number) {
-    await getOwnedForm(formId, adminId);
+    await requireFormAccess(formId, adminId, "edit");
     await getFieldOrThrow(fieldId, formId);
     if (await hasSubmissions(formId)) {
       // Answers reference this field (ON DELETE CASCADE) — hide it, keep the data.
@@ -724,7 +714,7 @@ export const formService = {
   },
 
   async reorderFields(formId: number, adminId: number, fieldIds: number[]) {
-    await getOwnedForm(formId, adminId);
+    await requireFormAccess(formId, adminId, "edit");
 
     const existingFields = await db
       .select({ id: formFields.id })
@@ -775,7 +765,7 @@ export const formService = {
   },
 
   async addOption(formId: number, fieldId: number, adminId: number, input: CreateFieldOptionInput) {
-    await getOwnedForm(formId, adminId);
+    await requireFormAccess(formId, adminId, "edit");
     await getFieldOrThrow(fieldId, formId);
 
     const [current] = await db
@@ -798,7 +788,7 @@ export const formService = {
   },
 
   async removeOption(formId: number, fieldId: number, optionId: number, adminId: number) {
-    await getOwnedForm(formId, adminId);
+    await requireFormAccess(formId, adminId, "edit");
     await getFieldOrThrow(fieldId, formId);
     await getOptionOrThrow(optionId, fieldId);
     if (await hasSubmissions(formId)) {

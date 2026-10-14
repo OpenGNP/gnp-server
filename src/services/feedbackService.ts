@@ -5,6 +5,7 @@ import type { CurrentUser } from "../middleware/authMiddleware";
 import { badRequest, conflict, notFound } from "../utils/errors";
 import { anonymousIdentityCode, createId } from "../utils/helper";
 import type { SubmitFeedbackInput } from "../validators/feedbackValidator";
+import { canAccessForm, requireFormAccess } from "./formAccess";
 import { formService } from "./formService";
 
 export const feedbackService = {
@@ -97,7 +98,7 @@ export const feedbackService = {
   },
 
   async listByForm(formId: number, adminId: number) {
-    await formService.assertOwnership(formId, adminId);
+    await requireFormAccess(formId, adminId, "view");
 
     return db.query.submissions.findMany({
       where: eq(submissions.formId, formId),
@@ -115,7 +116,8 @@ export const feedbackService = {
       },
     });
 
-    if (!submission || submission.form.adminId !== adminId) {
+    // 404, not 403, so a submission id can't be probed for whether it exists.
+    if (!submission || !canAccessForm(submission.form, adminId, "view")) {
       throw notFound("Submission not found");
     }
 

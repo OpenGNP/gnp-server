@@ -11,9 +11,9 @@ import {
   submissions,
   users,
 } from "../db/client";
-import { forbidden, notFound } from "../utils/errors";
 import { parseDbTimestamp } from "../utils/timestamp";
 import { createCalendar, resolveTimeZone, type Calendar } from "../utils/timezone";
+import { requireFormAccess } from "./formAccess";
 
 const SENTIMENT_LABELS = ["positive", "neutral", "negative"] as const;
 
@@ -315,17 +315,6 @@ function parseKeywords(raw: string | null): ThemeKeyword[] {
   return words.map((text, index) => ({ text, weight: index < 2 ? 3 : index < 5 ? 2 : 1 }));
 }
 
-async function assertFormOwner(formId: number, adminId: number) {
-  const [form] = await db
-    .select({ id: forms.id, adminId: forms.adminId, title: forms.formTitle })
-    .from(forms)
-    .where(eq(forms.id, formId))
-    .limit(1);
-
-  if (!form) throw notFound("Form not found");
-  if (form.adminId !== adminId) throw forbidden("You do not have access to this form");
-  return form;
-}
 
 /**
  * A form's demographic answers + the Themes/Trend demographic filter. `demo` maps a
@@ -446,10 +435,13 @@ export const analyticsService = {
       .innerJoin(forms, eq(submissions.formId, forms.id))
       .where(and(eq(forms.adminId, adminId), eq(points.isSevere, true)));
 
+    // Topics on this admin's forms. (canonical_topics no longer has a status column —
+    // every row is a live topic.)
     const [topicsCount] = await db
       .select({ value: count() })
       .from(canonicalTopics)
-      .where(eq(canonicalTopics.status, "active"));
+      .innerJoin(forms, eq(canonicalTopics.formId, forms.id))
+      .where(eq(forms.adminId, adminId));
 
     const sentimentBreakdown: Record<(typeof SENTIMENT_LABELS)[number], number> = {
       positive: 0,
@@ -501,7 +493,7 @@ export const analyticsService = {
    * checkbox → bar (`multi-choice`), text/textarea → response list (`text`).
    */
   async formResponses(formId: number, adminId: number) {
-    await assertFormOwner(formId, adminId);
+    await requireFormAccess(formId, adminId, "view");
 
     const fields = await db
       .select({
@@ -626,7 +618,7 @@ export const analyticsService = {
     adminId: number,
     opts: { from?: number; to?: number; demo?: Record<string, string[]>; timeZone?: string } = {},
   ) {
-    const form = await assertFormOwner(formId, adminId);
+    const form = await requireFormAccess(formId, adminId, "view");
     const cal = createCalendar(resolveTimeZone(opts.timeZone));
 
     // Resolve the analysis window the same way the Trend tab does: default to the
@@ -811,7 +803,7 @@ export const analyticsService = {
     );
 
     return {
-      title: `Discovered Themes of ${form.title ?? "this form"}`,
+      title: `Discovered Themes of ${form.formTitle ?? "this form"}`,
       from: fromIso,
       to: toIso,
       rangeLabel,
@@ -854,7 +846,7 @@ export const analyticsService = {
       demo?: Record<string, string[]>;
     } = {},
   ): Promise<FormTrend> {
-    await assertFormOwner(formId, adminId);
+    await requireFormAccess(formId, adminId, "view");
     const cal = createCalendar(resolveTimeZone(opts.timeZone));
 
     // Analysed mentions for this form across all time + when the first/last one landed —

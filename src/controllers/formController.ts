@@ -1,4 +1,5 @@
 import type { CurrentUser } from "../middleware/authMiddleware";
+import { resolveFormRef } from "../services/formAccess";
 import { formService } from "../services/formService";
 import type {
   CreateFieldOptionInput,
@@ -14,6 +15,9 @@ export const formController = {
     return formService.listByAdmin(adminId, folderId);
   },
 
+  resolveRef(ref: string, adminId: number) {
+    return resolveFormRef(ref, adminId);
+  },
   getForEdit(id: number, adminId: number) {
     return formService.getForEdit(id, adminId);
   },

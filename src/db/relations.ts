@@ -1,13 +1,13 @@
 import { relations } from "drizzle-orm/relations";
-import { organizations, users, forms, formFields, folders, fieldOptions, submissions, answers, canonicalTopics, points, aiModelRuns, formAllowedUsers } from "./schema";
+import { organizations, users, forms, formFields, folders, fieldOptions, submissions, answers, canonicalTopics, formAllowedUsers, points, aiModelRuns } from "./schema";
 
 export const usersRelations = relations(users, ({one, many}) => ({
 	organization: one(organizations, {
 		fields: [users.organizationId],
 		references: [organizations.id]
 	}),
-	folders: many(folders),
 	forms: many(forms),
+	folders: many(folders),
 	submissions: many(submissions),
 	formAllowedUsers: many(formAllowedUsers),
 }));
@@ -24,7 +24,6 @@ export const formFieldsRelations = relations(formFields, ({one, many}) => ({
 	}),
 	fieldOptions: many(fieldOptions),
 	answers: many(answers),
-	canonicalTopics: many(canonicalTopics),
 }));
 
 export const formsRelations = relations(forms, ({one, many}) => ({
@@ -43,11 +42,12 @@ export const formsRelations = relations(forms, ({one, many}) => ({
 	}),
 	submissions: many(submissions),
 	canonicalTopics: many(canonicalTopics),
-	aiModelRuns: many(aiModelRuns),
 	formAllowedUsers: many(formAllowedUsers),
+	aiModelRuns: many(aiModelRuns),
 }));
 
 export const foldersRelations = relations(folders, ({one, many}) => ({
+	forms: many(forms),
 	user: one(users, {
 		fields: [folders.adminId],
 		references: [users.id]
@@ -60,13 +60,24 @@ export const foldersRelations = relations(folders, ({one, many}) => ({
 	folders: many(folders, {
 		relationName: "folders_parentFolderId_folders_id"
 	}),
-	forms: many(forms),
 }));
 
 export const fieldOptionsRelations = relations(fieldOptions, ({one, many}) => ({
 	formField: one(formFields, {
 		fields: [fieldOptions.fieldId],
 		references: [formFields.id]
+	}),
+	answers: many(answers),
+}));
+
+export const submissionsRelations = relations(submissions, ({one, many}) => ({
+	form: one(forms, {
+		fields: [submissions.formId],
+		references: [forms.id]
+	}),
+	user: one(users, {
+		fields: [submissions.userId],
+		references: [users.id]
 	}),
 	answers: many(answers),
 }));
@@ -87,36 +98,23 @@ export const answersRelations = relations(answers, ({one, many}) => ({
 	points: many(points),
 }));
 
-export const submissionsRelations = relations(submissions, ({one, many}) => ({
-	answers: many(answers),
-	form: one(forms, {
-		fields: [submissions.formId],
-		references: [forms.id]
-	}),
-	user: one(users, {
-		fields: [submissions.userId],
-		references: [users.id]
-	}),
-}));
-
 export const canonicalTopicsRelations = relations(canonicalTopics, ({one, many}) => ({
 	form: one(forms, {
 		fields: [canonicalTopics.formId],
 		references: [forms.id]
 	}),
-	formField: one(formFields, {
-		fields: [canonicalTopics.fieldId],
-		references: [formFields.id]
-	}),
-	canonicalTopic: one(canonicalTopics, {
-		fields: [canonicalTopics.mergedIntoId],
-		references: [canonicalTopics.id],
-		relationName: "canonicalTopics_mergedIntoId_canonicalTopics_id"
-	}),
-	canonicalTopics: many(canonicalTopics, {
-		relationName: "canonicalTopics_mergedIntoId_canonicalTopics_id"
-	}),
 	points: many(points),
+}));
+
+export const formAllowedUsersRelations = relations(formAllowedUsers, ({one}) => ({
+	form: one(forms, {
+		fields: [formAllowedUsers.formId],
+		references: [forms.id]
+	}),
+	user: one(users, {
+		fields: [formAllowedUsers.userId],
+		references: [users.id]
+	}),
 }));
 
 export const pointsRelations = relations(points, ({one}) => ({
@@ -134,16 +132,5 @@ export const aiModelRunsRelations = relations(aiModelRuns, ({one}) => ({
 	form: one(forms, {
 		fields: [aiModelRuns.formId],
 		references: [forms.id]
-	}),
-}));
-
-export const formAllowedUsersRelations = relations(formAllowedUsers, ({one}) => ({
-	form: one(forms, {
-		fields: [formAllowedUsers.formId],
-		references: [forms.id]
-	}),
-	user: one(users, {
-		fields: [formAllowedUsers.userId],
-		references: [users.id]
 	}),
 }));
