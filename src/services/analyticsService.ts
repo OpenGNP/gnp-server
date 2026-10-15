@@ -464,9 +464,17 @@ export const analyticsService = {
     };
   },
 
-  /** Weekly per-topic feedback counts, computed from `points` (newest week first). */
+  /**
+   * Weekly per-topic feedback counts (newest week first).
+   *
+   * The week comes from the answer, not the point. `points.created_at` is
+   * when the AI pipeline wrote the row, and the pipeline runs in batches —
+   * every point from a single run shares one timestamp, which collapsed the
+   * whole chart into one bar. The answer carries when the student actually
+   * submitted, which is what a trend over time means.
+   */
   async trends(limit = 20) {
-    const periodStart = sql<string>`date_trunc('week', ${points.createdAt})`;
+    const periodStart = sql<string>`date_trunc('week', ${answers.createdAt})`;
 
     return db
       .select({
@@ -481,6 +489,7 @@ export const analyticsService = {
         severeCount: sql<number>`count(*) filter (where ${points.isSevere})`.mapWith(Number),
       })
       .from(points)
+      .innerJoin(answers, eq(points.answerId, answers.id))
       .innerJoin(canonicalTopics, eq(points.canonicalTopicId, canonicalTopics.id))
       .groupBy(points.canonicalTopicId, canonicalTopics.canonicalName, periodStart)
       .orderBy(desc(periodStart), points.canonicalTopicId)
