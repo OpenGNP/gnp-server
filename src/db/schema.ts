@@ -268,7 +268,7 @@ export const points = pgTable("points", {
 	check("chk_sentiment", sql`(sentiment_label)::text = ANY ((ARRAY['positive'::character varying, 'neutral'::character varying, 'negative'::character varying])::text[])`),
 	check("chk_processing", sql`(processing_status)::text = ANY (ARRAY[('pending'::character varying)::text, ('assigned'::character varying)::text, ('unknown'::character varying)::text, ('clustered'::character varying)::text])`),
 	check("chk_status_topic", sql`((processing_status)::text = 'assigned'::text) = (canonical_topic_id IS NOT NULL)`),
-	check("chk_labels_together", sql`(sentiment_label IS NULL) = (is_severe IS NULL)`),
+	check("chk_labels_together", sql`(sentiment_label IS NULL) = (is_violation IS NULL)`),
 ]);
 
 export const aiModelRuns = pgTable("ai_model_runs", {
