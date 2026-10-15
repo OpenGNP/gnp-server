@@ -718,7 +718,9 @@ export const analyticsService = {
       return t >= lastDayStart && t <= to;
     }).length;
     const endsToday = cal.start(Date.now(), "day") === cal.start(to - 1, "day");
-    const responderDeltaLabel = `+${recentResponders} ${endsToday ? "today" : `on ${cal.date(lastDayStart)}`}`;
+    // "14 Oct 2026" — short enough for one line on the stat card.
+    const lastDay = `${cal.label(lastDayStart, "day")} ${cal.label(lastDayStart, "year")}`;
+    const responderDeltaLabel = `+${recentResponders} ${endsToday ? "today" : `on ${lastDay}`}`;
 
     const overall: Record<Sentiment, number> = { negative: 0, neutral: 0, positive: 0 };
     for (const row of pointRows) {
