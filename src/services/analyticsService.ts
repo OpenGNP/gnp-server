@@ -649,8 +649,16 @@ export const analyticsService = {
       .innerJoin(submissions, eq(answers.submissionId, submissions.id))
       .where(and(eq(submissions.formId, formId), ne(points.processingStatus, "pending")));
     const totalMentions = allTime?.value ?? 0;
-    const earliestMs = allTime?.earliest ? parseTs(allTime.earliest) : NaN;
-    const latestMs = allTime?.latest ? parseTs(allTime.latest) : NaN;
+    // Nothing analysed yet: span the submissions instead, so the responder count
+    // covers everyone who answered rather than a default 90 days.
+    const [submissionSpan] = allTime?.earliest
+      ? [allTime]
+      : await db
+          .select({ earliest: min(submissions.createdAt), latest: max(submissions.createdAt) })
+          .from(submissions)
+          .where(eq(submissions.formId, formId));
+    const earliestMs = submissionSpan?.earliest ? parseTs(submissionSpan.earliest) : NaN;
+    const latestMs = submissionSpan?.latest ? parseTs(submissionSpan.latest) : NaN;
     const { from, to } = resolveFeedbackWindow(opts, earliestMs, latestMs);
     const fromIso = new Date(from).toISOString();
     const toIso = new Date(to).toISOString();
@@ -702,16 +710,15 @@ export const analyticsService = {
     const matchingSubmissions = windowSubmissions.filter((row) => matchesDemo(row.id));
     const totalResponders = matchingSubmissions.length;
 
-    // Responders (same date + demographic filters) in the last 7 days of the selected
-    // window. Called "this week" when the window runs up to now; otherwise it's the
-    // window's final week, so the label says so rather than implying "now".
-    const weekStart = Math.max(from, to - 7 * DAY_MS);
+    // Responders (same date + demographic filters) on the window's last calendar day,
+    // in the viewer's time zone: "today" when that is today, else that date.
+    const lastDayStart = Math.max(from, cal.start(to - 1, "day"));
     const recentResponders = matchingSubmissions.filter((row) => {
       const t = row.createdAt ? parseTs(row.createdAt) : NaN;
-      return t >= weekStart && t <= to;
+      return t >= lastDayStart && t <= to;
     }).length;
-    const windowEndsNow = Date.now() - to < DAY_MS;
-    const responderDeltaLabel = `+${recentResponders} ${windowEndsNow ? "this week" : "in final week"}`;
+    const endsToday = cal.start(Date.now(), "day") === cal.start(to - 1, "day");
+    const responderDeltaLabel = `+${recentResponders} ${endsToday ? "today" : `on ${cal.date(lastDayStart)}`}`;
 
     const overall: Record<Sentiment, number> = { negative: 0, neutral: 0, positive: 0 };
     for (const row of pointRows) {
