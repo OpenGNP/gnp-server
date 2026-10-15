@@ -848,8 +848,11 @@ export const analyticsService = {
       );
     });
 
+    // Same order as the dashboard's default "Priority" sort: most negative
+    // feedback first (often mentioned *and* negative), then the more mentioned topic.
     topics.sort(
       (a, b) =>
+        b.negative - a.negative ||
         b.negative + b.neutral + b.positive - (a.negative + a.neutral + a.positive),
     );
 
