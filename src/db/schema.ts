@@ -246,7 +246,7 @@ export const points = pgTable("points", {
 	pointText: text("point_text").notNull(),
 	embedding: vector({ dimensions: 384 }),
 	sentimentLabel: varchar("sentiment_label", { length: 20 }),
-	isSevere: boolean("is_severe"),
+	isViolation: boolean("is_violation"),
 	assignmentConfidence: real("assignment_confidence"),
 	processingStatus: varchar("processing_status", { length: 20 }).default('pending').notNull(),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).default(sql`CURRENT_TIMESTAMP`),

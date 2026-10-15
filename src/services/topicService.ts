@@ -26,7 +26,7 @@ export const topicService = {
         positiveCount: sql<number>`count(*) filter (where ${points.sentimentLabel} = 'positive')`.mapWith(Number),
         neutralCount: sql<number>`count(*) filter (where ${points.sentimentLabel} = 'neutral')`.mapWith(Number),
         negativeCount: sql<number>`count(*) filter (where ${points.sentimentLabel} = 'negative')`.mapWith(Number),
-        severeCount: sql<number>`count(*) filter (where ${points.isSevere})`.mapWith(Number),
+        severeCount: sql<number>`count(*) filter (where ${points.isViolation})`.mapWith(Number),
       })
       .from(points)
       .innerJoin(answers, eq(points.answerId, answers.id))
@@ -39,7 +39,7 @@ export const topicService = {
         id: points.id,
         pointText: points.pointText,
         sentimentLabel: points.sentimentLabel,
-        isSevere: points.isSevere,
+        isSevere: points.isViolation,
         // the date a reader cares about is when it was submitted
         createdAt: answers.createdAt,
       })
