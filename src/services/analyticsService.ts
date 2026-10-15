@@ -51,8 +51,8 @@ export type ThemeKeyword = { text: string; weight: 1 | 2 | 3 };
 export type ThemeFeedbackPoint = {
   id: string;
   sentiment: Sentiment;
-  /** The AI pipeline flagged this point as reporting a legal, ethical or moral breach. */
-  severe: boolean;
+  /** The AI pipeline flagged this point as a violation (points.is_violation). */
+  violation: boolean;
   quote: string;
   originalFeedback: string;
   submittedAt: string;
@@ -80,7 +80,7 @@ export type ThemeTopic = {
   neutral: number;
   positive: number;
   percentOfTotal: number;
-  isHighIntensity: boolean;
+  hasViolation: boolean;
   aiSummary: string;
   keywords: ThemeKeyword[];
   feedbackSegment: ThemeFeedbackPoint[];
@@ -123,7 +123,7 @@ export type TopicMovement = {
 export type TrendBucket = "day" | "week" | "month" | "year";
 
 /** How the topic picker ranks its list + which topics the chart auto-selects. */
-export type TrendRank = "mentioned" | "severe";
+export type TrendRank = "mentioned" | "violation";
 
 /** One row of the Trend topic picker — every topic seen in the window, ranked. */
 export type TrendAvailableTopic = {
@@ -131,8 +131,8 @@ export type TrendAvailableTopic = {
   label: string;
   /** Mentions in the selected window. */
   mentions: number;
-  /** Severe mentions in the selected window. */
-  severe: number;
+  /** Violations in the selected window. */
+  violations: number;
 };
 
 export type TrendVolumePoint = Record<string, number | string>;
@@ -222,7 +222,7 @@ const TREND_BUCKETS: readonly TrendBucket[] = ["day", "week", "month", "year"];
 export const isTrendBucket = (v: string | undefined): v is TrendBucket =>
   v !== undefined && (TREND_BUCKETS as readonly string[]).includes(v);
 
-const TREND_RANKS: readonly TrendRank[] = ["mentioned", "severe"];
+const TREND_RANKS: readonly TrendRank[] = ["mentioned", "violation"];
 export const isTrendRank = (v: string | undefined): v is TrendRank =>
   v !== undefined && (TREND_RANKS as readonly string[]).includes(v);
 
@@ -249,7 +249,7 @@ const MOVE_WORDING: Record<TrendBucket, { last: string; before: string }> = {
 const MIN_DELTA = 2;
 /** Rows shown in each of Rising / Declining. */
 const MOVEMENT_LIMIT = 5;
-/** Emerging issue (non-severe): at least this many negatives in the current window. */
+/** Emerging issue (no violation): at least this many negatives in the current window. */
 const EMERGING_MIN_NEGATIVE = 3;
 /** Timeline spike: a bucket count ≥ SPIKE_MIN_COUNT and ≥ SPIKE_MIN_ABOVE over the topic's earlier-bucket average. */
 const SPIKE_MIN_COUNT = 3;
@@ -431,7 +431,7 @@ export const analyticsService = {
       .where(eq(forms.adminId, adminId))
       .groupBy(points.sentimentLabel);
 
-    const [severeCount] = await db
+    const [violationCount] = await db
       .select({ value: count() })
       .from(points)
       .innerJoin(answers, eq(points.answerId, answers.id))
@@ -463,7 +463,7 @@ export const analyticsService = {
       forms: formsCount?.value ?? 0,
       submissions: submissionsCount?.value ?? 0,
       topics: topicsCount?.value ?? 0,
-      severeIssues: severeCount?.value ?? 0,
+      violations: violationCount?.value ?? 0,
       sentimentBreakdown,
     };
   },
@@ -490,7 +490,7 @@ export const analyticsService = {
         positiveCount: sql<number>`count(*) filter (where ${points.sentimentLabel} = 'positive')`.mapWith(Number),
         neutralCount: sql<number>`count(*) filter (where ${points.sentimentLabel} = 'neutral')`.mapWith(Number),
         negativeCount: sql<number>`count(*) filter (where ${points.sentimentLabel} = 'negative')`.mapWith(Number),
-        severeCount: sql<number>`count(*) filter (where ${points.isViolation})`.mapWith(Number),
+        violationCount: sql<number>`count(*) filter (where ${points.isViolation})`.mapWith(Number),
       })
       .from(points)
       .innerJoin(answers, eq(points.answerId, answers.id))
@@ -624,7 +624,7 @@ export const analyticsService = {
    * Theme analysis for one form's Dashboard "Themes" tab: overall sentiment, the
    * canonical topics its analysed feedback maps to (per-topic sentiment split,
    * keywords, and a demographic-tagged sample of feedback points), and the
-   * high-intensity subset. Trend line in the detail panel is synthetic client-side.
+   * topics with violations.
    */
   async formThemes(
     formId: number,
@@ -673,7 +673,7 @@ export const analyticsService = {
         // so the status is the only thing that tells them apart.
         status: points.processingStatus,
         sentiment: points.sentimentLabel,
-        severe: points.isViolation,
+        violation: points.isViolation,
         pointText: points.pointText,
         originalFeedback: answers.answerText,
         submissionId: submissions.id,
@@ -773,10 +773,10 @@ export const analyticsService = {
       rows: typeof pointRows,
     ): ThemeTopic => {
       const counts: Record<Sentiment, number> = { negative: 0, neutral: 0, positive: 0 };
-      let severe = 0;
+      let violations = 0;
       for (const row of rows) {
         counts[row.sentiment as Sentiment] += 1;
-        if (row.severe) severe += 1;
+        if (row.violation) violations += 1;
       }
 
       const volumeCounts = volume.starts.map(() => ({ negative: 0, neutral: 0, positive: 0 }));
@@ -793,7 +793,7 @@ export const analyticsService = {
       const feedbackSegment: ThemeFeedbackPoint[] = rows.map((row) => ({
         id: String(row.id),
         sentiment: row.sentiment as Sentiment,
-        severe: Boolean(row.severe),
+        violation: Boolean(row.violation),
         quote: row.pointText ?? "",
         originalFeedback: row.originalFeedback ?? row.pointText ?? "",
         submittedAt: row.submittedAt ?? new Date().toISOString(),
@@ -811,7 +811,7 @@ export const analyticsService = {
         neutral: counts.neutral,
         positive: counts.positive,
         percentOfTotal: Math.round((rows.length / assignedTotal) * 1000) / 10,
-        isHighIntensity: severe > 0,
+        hasViolation: violations > 0,
         aiSummary: summary,
         keywords,
         feedbackSegment,
@@ -842,7 +842,7 @@ export const analyticsService = {
         b.negative + b.neutral + b.positive - (a.negative + a.neutral + a.positive),
     );
 
-    // Appended after the sort, and after highIntenseTopics is taken from
+    // Appended after the sort, and after violationTopics is taken from
     // `topics`: it is a leftover bin, so it belongs at the end of the list and
     // not in a count of themes that need attention — even when something in it
     // is flagged, which its own badge still shows.
@@ -869,7 +869,7 @@ export const analyticsService = {
       responderDeltaLabel,
       demographicFilters,
       sentiment,
-      highIntenseTopics: topics.filter((topic) => topic.isHighIntensity),
+      violationTopics: topics.filter((topic) => topic.hasViolation),
       aiDiscoveredTopics: unplaced ? [...topics, unplaced] : topics,
     };
   },
@@ -883,7 +883,7 @@ export const analyticsService = {
    * MOVE_SPAN). The Timeline lists topic spikes within the chart buckets.
    *
    * Which topics get a line: `topics` (explicit ids from the picker, cap 8) wins;
-   * otherwise the top 5 by `rank` (mentioned / severe) that clear a small volume
+   * otherwise the top 5 by `rank` (mentioned / violation) that clear a small volume
    * floor. `availableTopics` returns *every* in-window topic ranked, so the picker
    * can search/scroll the full set.
    */
@@ -970,7 +970,7 @@ export const analyticsService = {
       .select({
         topicId: points.canonicalTopicId,
         sentiment: points.sentimentLabel,
-        severe: points.isViolation,
+        violation: points.isViolation,
         submittedAt: submissions.createdAt,
         submissionId: submissions.id,
       })
@@ -992,13 +992,13 @@ export const analyticsService = {
       ? await loadDemographics(formId, opts.demo)
       : { matchesDemo: () => true, isFiltering: false };
 
-    type CleanRow = { topicId: number; sentiment: Sentiment; severe: boolean; t: number };
+    type CleanRow = { topicId: number; sentiment: Sentiment; violation: boolean; t: number };
     const clean: CleanRow[] = [];
     for (const row of rows) {
       if (isFiltering && !matchesDemo(row.submissionId)) continue;
       const t = parseTs(row.submittedAt as string);
       if (Number.isNaN(t) || row.topicId === null || !isSentiment(row.sentiment)) continue;
-      clean.push({ topicId: row.topicId, sentiment: row.sentiment, severe: Boolean(row.severe), t });
+      clean.push({ topicId: row.topicId, sentiment: row.sentiment, violation: Boolean(row.violation), t });
     }
     if (clean.length === 0) return empty;
 
@@ -1020,22 +1020,22 @@ export const analyticsService = {
     const nameOf = (id: number) => nameById.get(id) ?? "Untitled topic";
 
     // --- per-topic totals: selected window vs the previous equal window --------
-    type Tally = { total: number; neg: number; pos: number; severe: number };
+    type Tally = { total: number; neg: number; pos: number; violations: number };
     const tallyBy = (list: CleanRow[]) => {
       const map = new Map<number, Tally>();
       for (const r of list) {
-        const t = map.get(r.topicId) ?? { total: 0, neg: 0, pos: 0, severe: 0 };
+        const t = map.get(r.topicId) ?? { total: 0, neg: 0, pos: 0, violations: 0 };
         t.total += 1;
         if (r.sentiment === "negative") t.neg += 1;
         if (r.sentiment === "positive") t.pos += 1;
-        if (r.severe) t.severe += 1;
+        if (r.violation) t.violations += 1;
         map.set(r.topicId, t);
       }
       return map;
     };
     const cur = tallyBy(current);
     const prev = tallyBy(previous);
-    const zero: Tally = { total: 0, neg: 0, pos: 0, severe: 0 };
+    const zero: Tally = { total: 0, neg: 0, pos: 0, violations: 0 };
 
     // --- Rising / Declining: counts in the two rolling windows ---------------
     const moveCur = tallyBy(clean.filter((r) => r.t > to - moveSpan && r.t <= to));
@@ -1074,7 +1074,7 @@ export const analyticsService = {
     // --- topic picker: rank every in-window topic ---------------------------
     const rankScore = (id: number): number => {
       const c = cur.get(id) ?? zero;
-      return rank === "severe" ? c.severe * 100_000 + c.neg : c.total; // else "mentioned"
+      return rank === "violation" ? c.violations * 100_000 + c.neg : c.total; // else "mentioned"
     };
     const rankedIds = [...topicIds].sort(
       (a, b) => rankScore(b) - rankScore(a) || (cur.get(b)?.total ?? 0) - (cur.get(a)?.total ?? 0),
@@ -1085,7 +1085,7 @@ export const analyticsService = {
         id: String(id),
         label: nameOf(id),
         mentions: cur.get(id)?.total ?? 0,
-        severe: cur.get(id)?.severe ?? 0,
+        violations: cur.get(id)?.violations ?? 0,
       }));
 
     // Which topics get a line: explicit `topics` (cap 8) wins; else the top N by
@@ -1109,25 +1109,25 @@ export const analyticsService = {
     const topicVolumeSeries = selectedIds.map((id) => ({ id: String(id), label: nameOf(id) }));
     const seriesIds = new Set(selectedIds);
 
-    // Emerging issues: a severe mention in the current window, or negatives ≥ 3 that are
+    // Emerging issues: a violation in the current window, or negatives ≥ 3 that are
     // at least double the previous window's and up by at least 2.
     const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
     const emergingIssues = topicIds
       .map((id) => ({ id, cur: moveCur.get(id) ?? zero, prev: movePrev.get(id) ?? zero }))
       .filter(
         ({ cur: c, prev: p }) =>
-          c.severe > 0 || (c.neg >= EMERGING_MIN_NEGATIVE && c.neg >= Math.max(2 * p.neg, p.neg + 2)),
+          c.violations > 0 || (c.neg >= EMERGING_MIN_NEGATIVE && c.neg >= Math.max(2 * p.neg, p.neg + 2)),
       )
-      .sort((a, b) => b.cur.severe - a.cur.severe || b.cur.neg - b.prev.neg - (a.cur.neg - a.prev.neg))
+      .sort((a, b) => b.cur.violations - a.cur.violations || b.cur.neg - b.prev.neg - (a.cur.neg - a.prev.neg))
       .slice(0, 3)
       .map(({ id, cur: c, prev: p }) => ({
         id: String(id),
         title: nameOf(id),
         description:
-          c.severe > 0
-            ? `${plural(c.severe, "severe report")} ${wording.last}`
+          c.violations > 0
+            ? `${plural(c.violations, "violation")} ${wording.last}`
             : `${plural(c.neg, "negative mention")} ${wording.last} (${p.neg} ${wording.before})`,
-        riskLabel: c.severe > 0 ? "Critical" : "High",
+        riskLabel: c.violations > 0 ? "Critical" : "High",
       }));
 
     // --- real time series over the selected window --------------------------

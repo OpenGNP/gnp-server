@@ -85,7 +85,7 @@ export const analyticsRoutes = new Elysia({ prefix: "/analytics" })
         summary: "Trend over a time window + bucket (Trend tab)",
         description:
           "Query: from / to (ISO dates), bucket (day | week | month | year), " +
-          "rank (movers | mentioned | severe — orders availableTopics + auto-picks lines), " +
+          "rank (mentioned | violation — orders availableTopics + auto-picks lines), " +
           "topics (comma-separated topic ids to chart, max 8), tz (IANA zone — where days start; default UTC), " +
           "demo (same JSON demographic filter as /themes). " +
           "Returns a real time series plus availableTopics for the picker.",

@@ -107,7 +107,7 @@ const FACILITIES = [
 ] as const;
 
 type Sentiment = "positive" | "neutral" | "negative";
-type TextEntry = { text: string; sentiment: Sentiment; topic: string | null; severe?: boolean };
+type TextEntry = { text: string; sentiment: Sentiment; topic: string | null; violation?: boolean };
 
 const TOPICS = [
   {
@@ -515,7 +515,7 @@ async function main() {
 
   // Submissions -------------------------------------------------------
   const RESPONSE_COUNT = 55;
-  type PointSeed = { topicId: number; sentiment: Sentiment; severe: boolean };
+  type PointSeed = { topicId: number; sentiment: Sentiment; violation: boolean };
   const allPoints: PointSeed[] = [];
 
   for (let i = 0; i < RESPONSE_COUNT; i += 1) {
@@ -596,13 +596,13 @@ async function main() {
         canonicalTopicId: topicId ?? null,
         pointText: entry.text,
         sentimentLabel: entry.sentiment,
-        isSevere: entry.severe ?? false,
+        isViolation: entry.violation ?? false,
         assignmentConfidence: topicId ? 0.7 + Math.random() * 0.29 : null,
         processingStatus: topicId ? "assigned" : "unknown",
         createdAt: submittedAt,
       });
       if (topicId) {
-        allPoints.push({ topicId, sentiment: entry.sentiment, severe: entry.severe ?? false });
+        allPoints.push({ topicId, sentiment: entry.sentiment, violation: entry.violation ?? false });
       }
     };
 
