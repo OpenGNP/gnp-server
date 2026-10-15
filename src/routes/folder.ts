@@ -64,7 +64,7 @@ export const folderRoutes = new Elysia({ prefix: "/folders" })
     "/reorder",
     async ({ body, currentUser }) => {
       assertCurrentUser(currentUser);
-      await folderController.reorderFolders(currentUser.id, body.folderIds);
+      await folderController.reorderFolders(currentUser.id, body.parentFolderId ?? null, body.folderIds);
       return successResponse("Folders reordered successfully", null);
     },
     {
@@ -72,8 +72,10 @@ export const folderRoutes = new Elysia({ prefix: "/folders" })
       detail: {
         tags,
         security,
-        summary: "Reorder my top-level folders",
-        description: "folderIds must match exactly the folders you currently have.",
+        summary: "Reorder the folders inside one parent folder (or the top level)",
+        description:
+          "parentFolderId (null/omitted = top level) picks the location; folderIds must match " +
+          "exactly the folders in it.",
       },
     },
   );

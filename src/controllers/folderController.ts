@@ -22,7 +22,7 @@ export const folderController = {
     return folderService.remove(id, adminId);
   },
 
-  reorderFolders(adminId: number, folderIds: number[]) {
-    return folderService.reorderFolders(adminId, folderIds);
+  reorderFolders(adminId: number, parentFolderId: number | null, folderIds: number[]) {
+    return folderService.reorderFolders(adminId, parentFolderId, folderIds);
   },
 };

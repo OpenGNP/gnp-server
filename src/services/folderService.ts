@@ -1,7 +1,7 @@
-import { count, desc, eq, max } from "drizzle-orm";
+import { and, count, desc, eq, isNull, max } from "drizzle-orm";
 
 import { db, folders, forms } from "../db/client";
-import { badRequest, forbidden, notFound } from "../utils/errors";
+import { badRequest, forbidden, isUniqueViolation, notFound } from "../utils/errors";
 import type { CreateFolderInput, UpdateFolderInput } from "../validators/folderValidator";
 
 const nowIso = () => new Date().toISOString();
@@ -15,11 +15,34 @@ async function getOwnedFolder(id: number, adminId: number) {
   return folder;
 }
 
+const siblingsOf = (adminId: number, parentFolderId: number | null) =>
+  and(
+    eq(folders.adminId, adminId),
+    parentFolderId === null ? isNull(folders.parentFolderId) : eq(folders.parentFolderId, parentFolderId),
+  );
+
+/** Throws unless `parentId` is the admin's folder and not `folderId` itself or inside it. */
+async function assertValidParent(adminId: number, parentId: number, folderId?: number) {
+  let current: number | null = parentId;
+  while (current !== null) {
+    if (current === folderId) throw badRequest("A folder can't be moved into itself");
+    const parent = await getOwnedFolder(current, adminId);
+    current = parent.parentFolderId;
+  }
+}
+
+/** uq_folder_sibling_name: two folders with the same name in one place. */
+function rethrowDuplicateName(error: unknown): never {
+  if (isUniqueViolation(error)) throw badRequest("A folder with that name already exists here");
+  throw error;
+}
+
 export const folderService = {
   async listByAdmin(adminId: number) {
     return db
       .select({
         id: folders.id,
+        parentFolderId: folders.parentFolderId,
         folderName: folders.folderName,
         folderDescription: folders.folderDescription,
         sortOrder: folders.sortOrder,
@@ -52,28 +75,33 @@ export const folderService = {
   },
 
   async create(adminId: number, input: CreateFolderInput) {
-    // New folders append to the end of the (flat, top-level) list — same "current
-    // max + 1" pattern as forms.sortOrder.
+    const parentFolderId = input.parentFolderId ?? null;
+    if (parentFolderId !== null) await assertValidParent(adminId, parentFolderId);
+
+    // Appends to the end of its siblings — same "current max + 1" pattern as forms.sortOrder.
     const [current] = await db
       .select({ value: max(folders.sortOrder) })
       .from(folders)
-      .where(eq(folders.adminId, adminId));
+      .where(siblingsOf(adminId, parentFolderId));
 
     const [folder] = await db
       .insert(folders)
       .values({
         adminId,
+        parentFolderId,
         folderName: input.folderName,
         folderDescription: input.folderDescription,
         sortOrder: (current?.value ?? -1) + 1,
       })
-      .returning();
+      .returning()
+      .catch(rethrowDuplicateName);
 
     return folder!;
   },
 
   async update(id: number, adminId: number, input: UpdateFolderInput) {
     await getOwnedFolder(id, adminId);
+    if (input.parentFolderId) await assertValidParent(adminId, input.parentFolderId, id);
 
     // Stamp updated_at ($defaultFn only fires on insert) so "date modified" moves on
     // rename. reorderFolders deliberately does NOT — a drag isn't a content change.
@@ -81,23 +109,34 @@ export const folderService = {
       .update(folders)
       .set({ ...input, updatedAt: nowIso() })
       .where(eq(folders.id, id))
-      .returning();
+      .returning()
+      .catch(rethrowDuplicateName);
 
     return updated!;
   },
 
+  /** Deletes the folder only: its subfolders and forms move up to its parent (as the app shows). */
   async remove(id: number, adminId: number) {
-    await getOwnedFolder(id, adminId);
-    await db.delete(folders).where(eq(folders.id, id));
+    const folder = await getOwnedFolder(id, adminId);
+    await db
+      .transaction(async (tx) => {
+        await tx.update(folders).set({ parentFolderId: folder.parentFolderId }).where(eq(folders.parentFolderId, id));
+        await tx.update(forms).set({ folderId: folder.parentFolderId }).where(eq(forms.folderId, id));
+        await tx.delete(folders).where(eq(folders.id, id));
+      })
+      .catch(rethrowDuplicateName);
   },
 
-  /** Reorders the admin's top-level folders. Folders aren't nested in the API, so this is the whole list. */
-  async reorderFolders(adminId: number, folderIds: number[]) {
-    const existingFolders = await db.select({ id: folders.id }).from(folders).where(eq(folders.adminId, adminId));
+  /** Reorders the folders inside one parent (null = top level). */
+  async reorderFolders(adminId: number, parentFolderId: number | null, folderIds: number[]) {
+    const existingFolders = await db
+      .select({ id: folders.id })
+      .from(folders)
+      .where(siblingsOf(adminId, parentFolderId));
     const existingIds = new Set(existingFolders.map((folder) => folder.id));
 
     if (folderIds.length !== existingIds.size || !folderIds.every((id) => existingIds.has(id))) {
-      throw badRequest("folderIds must match your folders exactly");
+      throw badRequest("folderIds must match the folders in that location exactly");
     }
 
     await db.transaction(async (tx) => {
