@@ -1,4 +1,4 @@
-import { and, count, countDistinct, desc, eq, gte, inArray, isNotNull, lte, max, min, sql } from "drizzle-orm";
+import { and, count, countDistinct, desc, eq, gte, inArray, isNotNull, lte, max, min, ne, sql } from "drizzle-orm";
 
 import {
   answers,
@@ -645,7 +645,7 @@ export const analyticsService = {
       .from(points)
       .innerJoin(answers, eq(points.answerId, answers.id))
       .innerJoin(submissions, eq(answers.submissionId, submissions.id))
-      .where(and(eq(submissions.formId, formId), isNotNull(points.canonicalTopicId)));
+      .where(and(eq(submissions.formId, formId), ne(points.processingStatus, "pending")));
     const totalMentions = allTime?.value ?? 0;
     const earliestMs = allTime?.earliest ? parseTs(allTime.earliest) : NaN;
     const latestMs = allTime?.latest ? parseTs(allTime.latest) : NaN;
@@ -915,7 +915,7 @@ export const analyticsService = {
       .from(points)
       .innerJoin(answers, eq(points.answerId, answers.id))
       .innerJoin(submissions, eq(answers.submissionId, submissions.id))
-      .where(and(eq(submissions.formId, formId), isNotNull(points.canonicalTopicId)));
+      .where(and(eq(submissions.formId, formId), ne(points.processingStatus, "pending")));
     const totalMentions = allTime?.value ?? 0;
     const earliestMs = allTime?.earliest ? parseTs(allTime.earliest) : NaN;
     const latestMs = allTime?.latest ? parseTs(allTime.latest) : NaN;
