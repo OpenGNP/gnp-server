@@ -210,7 +210,9 @@ function resolveFeedbackWindow(
   latestMs: number,
 ): { from: number; to: number; span: number } {
   const DEFAULT_SPAN = 90 * DAY_MS;
-  const defaultTo = Number.isFinite(latestMs) ? latestMs : Date.now();
+  // +1ms: Postgres keeps microseconds, JS only milliseconds, so the newest
+  // submission sits just after `latestMs` and `<= to` would drop it.
+  const defaultTo = Number.isFinite(latestMs) ? latestMs + 1 : Date.now();
   const defaultFrom = Number.isFinite(earliestMs) ? earliestMs : defaultTo - DEFAULT_SPAN;
   const to = Number.isFinite(opts.to) ? (opts.to as number) : defaultTo;
   let from = Number.isFinite(opts.from) ? (opts.from as number) : defaultFrom;
