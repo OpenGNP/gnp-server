@@ -88,6 +88,10 @@ export type ThemeTopic = {
   volumeSeries: ThemeVolumePoint[];
 };
 
+/** Stands in for a topic id on the bin of feedback nothing grouped. Never a
+ *  real canonical_topics row, so it must not be used to fetch one. */
+const UNCATEGORISED_ID = "uncategorised";
+
 /** Dashboard auto-bucketed charts get 6–12 x-axis points. */
 const POINTS_MIN = 6;
 const POINTS_MAX = 12;
@@ -433,7 +437,7 @@ export const analyticsService = {
       .innerJoin(answers, eq(points.answerId, answers.id))
       .innerJoin(submissions, eq(answers.submissionId, submissions.id))
       .innerJoin(forms, eq(submissions.formId, forms.id))
-      .where(and(eq(forms.adminId, adminId), eq(points.isSevere, true)));
+      .where(and(eq(forms.adminId, adminId), eq(points.isViolation, true)));
 
     // Topics on this admin's forms. (canonical_topics no longer has a status column —
     // every row is a live topic.)
@@ -486,7 +490,7 @@ export const analyticsService = {
         positiveCount: sql<number>`count(*) filter (where ${points.sentimentLabel} = 'positive')`.mapWith(Number),
         neutralCount: sql<number>`count(*) filter (where ${points.sentimentLabel} = 'neutral')`.mapWith(Number),
         negativeCount: sql<number>`count(*) filter (where ${points.sentimentLabel} = 'negative')`.mapWith(Number),
-        severeCount: sql<number>`count(*) filter (where ${points.isSevere})`.mapWith(Number),
+        severeCount: sql<number>`count(*) filter (where ${points.isViolation})`.mapWith(Number),
       })
       .from(points)
       .innerJoin(answers, eq(points.answerId, answers.id))
@@ -664,8 +668,12 @@ export const analyticsService = {
       .select({
         id: points.id,
         topicId: points.canonicalTopicId,
+        // 'unknown' is a point the pipeline looked at and could not place;
+        // 'pending' is one it has not reached yet. Both carry a null topic,
+        // so the status is the only thing that tells them apart.
+        status: points.processingStatus,
         sentiment: points.sentimentLabel,
-        severe: points.isSevere,
+        severe: points.isViolation,
         pointText: points.pointText,
         originalFeedback: answers.answerText,
         submissionId: submissions.id,
@@ -723,7 +731,15 @@ export const analyticsService = {
     };
 
     const assigned = pointRows.filter((row) => row.topicId !== null && isSentiment(row.sentiment));
-    const assignedTotal = assigned.length || 1;
+    // Feedback the pipeline placed nowhere. Worth a card of its own: these are
+    // real submissions, often the most specific ones, and dropping them left
+    // them counted in the sentiment gauge but visible in no topic.
+    const uncategorised = pointRows.filter(
+      (row) => row.topicId === null && row.status === "unknown" && isSentiment(row.sentiment),
+    );
+    // Percentages are of everything the pipeline has classified, so the cards
+    // add up to 100 rather than quietly leaving the unplaced out.
+    const assignedTotal = assigned.length + uncategorised.length || 1;
     const topicIds = [...new Set(assigned.map((row) => row.topicId as number))];
 
     const topicMeta =
@@ -749,9 +765,13 @@ export const analyticsService = {
       return index;
     };
 
-    const topics: ThemeTopic[] = topicIds.map((topicId) => {
-      const meta = metaById.get(topicId);
-      const rows = assigned.filter((row) => row.topicId === topicId);
+    const buildTopic = (
+      id: string,
+      label: string,
+      summary: string,
+      keywords: ThemeKeyword[],
+      rows: typeof pointRows,
+    ): ThemeTopic => {
       const counts: Record<Sentiment, number> = { negative: 0, neutral: 0, positive: 0 };
       let severe = 0;
       for (const row of rows) {
@@ -785,15 +805,15 @@ export const analyticsService = {
       }));
 
       return {
-        id: String(topicId),
-        label: meta?.name ?? "Untitled topic",
+        id,
+        label,
         negative: counts.negative,
         neutral: counts.neutral,
         positive: counts.positive,
         percentOfTotal: Math.round((rows.length / assignedTotal) * 1000) / 10,
         isHighIntensity: severe > 0,
-        aiSummary: meta?.summary ?? "",
-        keywords: parseKeywords(meta?.keywords ?? null),
+        aiSummary: summary,
+        keywords,
         feedbackSegment,
         volumeSeries: volume.starts.map((start, i) => {
           const bucket = volumeCounts[i]!;
@@ -804,12 +824,38 @@ export const analyticsService = {
           };
         }),
       };
+    };
+
+    const topics: ThemeTopic[] = topicIds.map((topicId) => {
+      const meta = metaById.get(topicId);
+      return buildTopic(
+        String(topicId),
+        meta?.name ?? "Untitled topic",
+        meta?.summary ?? "",
+        parseKeywords(meta?.keywords ?? null),
+        assigned.filter((row) => row.topicId === topicId),
+      );
     });
 
     topics.sort(
       (a, b) =>
         b.negative + b.neutral + b.positive - (a.negative + a.neutral + a.positive),
     );
+
+    // Appended after the sort, and after highIntenseTopics is taken from
+    // `topics`: it is a leftover bin, so it belongs at the end of the list and
+    // not in a count of themes that need attention — even when something in it
+    // is flagged, which its own badge still shows.
+    const unplaced = uncategorised.length
+      ? buildTopic(
+          UNCATEGORISED_ID,
+          "Uncategorised feedback",
+          "Feedback the model could not group with anything else — usually a one-off, " +
+            "or an issue too new to have been raised by enough people yet.",
+          [],
+          uncategorised,
+        )
+      : null;
 
     return {
       title: `Discovered Themes of ${form.formTitle ?? "this form"}`,
@@ -824,7 +870,7 @@ export const analyticsService = {
       demographicFilters,
       sentiment,
       highIntenseTopics: topics.filter((topic) => topic.isHighIntensity),
-      aiDiscoveredTopics: topics,
+      aiDiscoveredTopics: unplaced ? [...topics, unplaced] : topics,
     };
   },
 
@@ -924,7 +970,7 @@ export const analyticsService = {
       .select({
         topicId: points.canonicalTopicId,
         sentiment: points.sentimentLabel,
-        severe: points.isSevere,
+        severe: points.isViolation,
         submittedAt: submissions.createdAt,
         submissionId: submissions.id,
       })
