@@ -894,7 +894,6 @@ export const analyticsService = {
       : null;
 
     return {
-      title: `Discovered Themes of ${form.formTitle ?? "this form"}`,
       from: fromIso,
       to: toIso,
       rangeLabel,
