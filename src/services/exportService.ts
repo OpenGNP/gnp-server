@@ -165,7 +165,22 @@ type ThemesTables = {
   feedback: { headers: string[]; rows: Cell[][] };
 };
 
+type Counts = { negative: number; neutral: number; positive: number };
+const mentionsOf = (topic: Counts) => topic.negative + topic.neutral + topic.positive;
+
+/** The Themes topic orders — mirrors gnp-client's components/dashboard/topicSort.ts; change both together. */
+export const TOPIC_SORTS = {
+  priority: { label: "Priority", compare: (a: Counts, b: Counts) => b.negative - a.negative || mentionsOf(b) - mentionsOf(a) },
+  negative: { label: "Most negative", compare: (a: Counts, b: Counts) => b.negative - a.negative || mentionsOf(b) - mentionsOf(a) },
+  mentions: { label: "Most mentioned", compare: (a: Counts, b: Counts) => mentionsOf(b) - mentionsOf(a) || b.negative - a.negative },
+  positive: { label: "Most positive", compare: (a: Counts, b: Counts) => b.positive - a.positive || mentionsOf(b) - mentionsOf(a) },
+} as const;
+export type TopicSort = keyof typeof TOPIC_SORTS;
+export const isTopicSort = (value: unknown): value is TopicSort =>
+  typeof value === "string" && Object.hasOwn(TOPIC_SORTS, value);
+
 type ThemesExportOptions = {
+  sort: TopicSort;
   from?: number;
   to?: number;
   demo?: Record<string, string[]>;
@@ -190,7 +205,14 @@ async function loadThemesTables(formId: number, adminId: number, opts: ThemesExp
       .orderBy(asc(submissions.createdAt), asc(submissions.id)),
   ]);
   const responseNumber = new Map(order.map((row, index) => [row.id, index + 1]));
-  const topics = themes.aiDiscoveredTopics;
+  // As the screen lists them: the chosen order, uncategorised last, and for Priority
+  // violation topics first.
+  const pinViolations = opts.sort === "priority";
+  const pinRank = (topic: { id: string; hasViolation: boolean }) =>
+    topic.id === "uncategorised" ? 2 : pinViolations && topic.hasViolation ? 0 : 1;
+  const topics = [...themes.aiDiscoveredTopics].sort(
+    (a, b) => pinRank(a) - pinRank(b) || TOPIC_SORTS[opts.sort].compare(a, b),
+  );
   const share = (part: number, whole: number) => (whole > 0 ? part / whole : 0);
 
   const demoFilter = Object.entries(opts.demo ?? {})
@@ -204,6 +226,7 @@ async function loadThemesTables(formId: number, adminId: number, opts: ThemesExp
     ["Form", form.formTitle?.trim() || "Untitled form"],
     ["Date range", themes.rangeLabel],
     ["Respondents", demoFilter || "Everyone"],
+    ["Topics sorted by", `${TOPIC_SORTS[opts.sort].label}${pinViolations ? " (violations first)" : ""}`],
     ["Exported at", formatLocal(new Date().toISOString(), timeZone)],
     ["Responders in range", themes.totalResponders],
     ["Analysed feedback", analysed],

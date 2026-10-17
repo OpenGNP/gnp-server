@@ -1,5 +1,5 @@
 import { analyticsService, isTrendBucket, isTrendRank } from "../services/analyticsService";
-import { exportService } from "../services/exportService";
+import { exportService, isTopicSort } from "../services/exportService";
 
 const parseMs = (value?: string): number | undefined => {
   if (!value) return undefined;
@@ -66,9 +66,10 @@ export const analyticsController = {
   exportThemes(
     formId: number,
     adminId: number,
-    query: { from?: string; to?: string; demo?: string; tz?: string; includeNames: boolean },
+    query: { from?: string; to?: string; demo?: string; tz?: string; sort?: string; includeNames: boolean },
   ) {
     return exportService.exportThemes(formId, adminId, {
+      sort: isTopicSort(query.sort) ? query.sort : "priority",
       from: parseMs(query.from),
       to: parseMs(query.to),
       demo: parseDemoFilter(query.demo),
