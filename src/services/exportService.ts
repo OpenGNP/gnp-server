@@ -1,13 +1,14 @@
 import ExcelJS from "exceljs";
-import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { asc, eq, inArray, sql } from "drizzle-orm";
 
 import { answers, db, fieldOptions, formFields, submissions, users } from "../db/client";
-import { requireFormAccess } from "./formAccess";
 import { resolveTimeZone } from "../utils/timezone";
+import { analyticsService } from "./analyticsService";
+import { requireFormAccess } from "./formAccess";
 
 export type ExportFormat = "xlsx" | "csv";
 
-type ResponseTable = { title: string; headers: string[]; rows: { submittedAt: string; cells: string[] }[] };
+type ResponseTable = { headers: string[]; rows: { submittedAt: string; cells: string[] }[] };
 
 /** "2026-10-17 14:05:09" — the instant's wall-clock time in `timeZone`. */
 function formatLocal(iso: string, timeZone: string): string {
@@ -33,12 +34,12 @@ async function loadResponseTable(
   timeZone: string,
   includeNames: boolean,
 ): Promise<ResponseTable> {
-  const form = await requireFormAccess(formId, adminId, "view");
+  await requireFormAccess(formId, adminId, "view");
 
-  const fields = await db
-    .select({ id: formFields.id, label: formFields.fieldLabel, type: formFields.fieldType })
+  const allFields = await db
+    .select({ id: formFields.id, label: formFields.fieldLabel, type: formFields.fieldType, deletedAt: formFields.deletedAt })
     .from(formFields)
-    .where(and(eq(formFields.formId, formId), isNull(formFields.deletedAt)))
+    .where(eq(formFields.formId, formId))
     .orderBy(asc(formFields.fieldOrder), asc(formFields.id));
 
   const subs = await db
@@ -67,6 +68,10 @@ async function loadResponseTable(
         .orderBy(asc(answers.submissionId), asc(fieldOptions.optionOrder), asc(answers.id))
     : [];
 
+  // Like the dashboard: removed questions stay while they still hold answers.
+  const answeredFields = new Set(answerRows.map((row) => row.fieldId));
+  const fields = allFields.filter((field) => !field.deletedAt || answeredFields.has(field.id));
+
   // submissionId → fieldId → values; a free-text answer on a choice field is its "Other".
   const choiceFields = new Set(
     fields.filter((field) => field.type === "radio" || field.type === "checkbox").map((field) => field.id),
@@ -84,7 +89,9 @@ async function loadResponseTable(
   const headers = [
     "Submitted at",
     ...(withNames ? ["Respondent"] : []),
-    ...fields.map((field, index) => field.label?.trim() || `Question ${index + 1}`),
+    ...fields.map(
+      (field, index) => `${field.label?.trim() || `Question ${index + 1}`}${field.deletedAt ? " (removed)" : ""}`,
+    ),
   ];
 
   const rows = subs.map((sub) => {
@@ -98,11 +105,51 @@ async function loadResponseTable(
     };
   });
 
-  return { title: form.formTitle?.trim() || "Responses", headers, rows };
+  return { headers, rows };
 }
 
-async function toXlsx(table: ResponseTable): Promise<Buffer> {
-  const workbook = new ExcelJS.Workbook();
+type SummaryTable = {
+  title: string;
+  totalResponses: number;
+  exportedAt: string;
+  questions: { title: string; note: string | null; rows: { label: string; count: number; share: number }[] }[];
+};
+
+/** Option counts per choice question — the Response tab's charts as tables. Free-text answers live in the raw sheet. */
+async function loadSummaryTable(formId: number, adminId: number, timeZone: string): Promise<SummaryTable> {
+  const form = await requireFormAccess(formId, adminId, "view");
+  const analytics = await analyticsService.formResponses(formId, adminId);
+
+  const questions = [...analytics.demographic, ...analytics.feedback].flatMap((breakdown) => {
+    if (breakdown.kind === "text") return [];
+    // Same denominators as the dashboard cards: answers to a single-choice question,
+    // respondents to a multi-choice one (whose shares can sum past 100%).
+    const base =
+      breakdown.kind === "multi-choice"
+        ? breakdown.totalRespondents
+        : breakdown.options.reduce((sum, option) => sum + option.value, 0);
+    return [
+      {
+        title: breakdown.title,
+        note: breakdown.kind === "multi-choice" ? `${base} respondents, could select more than one` : null,
+        rows: breakdown.options.map((option) => ({
+          label: option.label,
+          count: option.value,
+          share: base > 0 ? option.value / base : 0,
+        })),
+      },
+    ];
+  });
+
+  return {
+    title: form.formTitle?.trim() || "Responses",
+    totalResponses: analytics.totalResponses,
+    exportedAt: formatLocal(new Date().toISOString(), timeZone),
+    questions,
+  };
+}
+
+function addResponsesSheet(workbook: ExcelJS.Workbook, table: ResponseTable) {
   const sheet = workbook.addWorksheet("Responses", { views: [{ state: "frozen", ySplit: 1 }] });
 
   sheet.addRow(table.headers).font = { bold: true };
@@ -120,7 +167,36 @@ async function toXlsx(table: ResponseTable): Promise<Buffer> {
     );
     column.width = Math.min(Math.max(longest + 2, 12), 60);
   });
+}
 
+function addSummarySheet(workbook: ExcelJS.Workbook, summary: SummaryTable) {
+  const sheet = workbook.addWorksheet("Summary");
+  sheet.columns = [{ width: 40 }, { width: 12 }, { width: 12 }];
+
+  sheet.addRow(["Form", summary.title]).getCell(1).font = { bold: true };
+  sheet.addRow(["Total responses", summary.totalResponses]).getCell(1).font = { bold: true };
+  sheet.addRow(["Exported at", summary.exportedAt]).getCell(1).font = { bold: true };
+
+  for (const question of summary.questions) {
+    sheet.addRow([]);
+    sheet.addRow([question.title]).font = { bold: true };
+    if (question.note) sheet.addRow([question.note]).font = { italic: true, color: { argb: "FF6B7280" } };
+
+    const header = sheet.addRow(["Option", "Count", "%"]);
+    header.font = { bold: true, color: { argb: "FFFFFFFF" } };
+    header.eachCell((cell) => {
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1E55C5" } };
+    });
+    for (const row of question.rows) {
+      sheet.addRow([row.label, row.count, row.share]).getCell(3).numFmt = "0%";
+    }
+  }
+}
+
+async function toXlsx(table: ResponseTable, summary: SummaryTable): Promise<Buffer> {
+  const workbook = new ExcelJS.Workbook();
+  addResponsesSheet(workbook, table);
+  addSummarySheet(workbook, summary);
   return Buffer.from(await workbook.xlsx.writeBuffer());
 }
 
@@ -135,7 +211,7 @@ function toCsv(table: ResponseTable): Buffer {
     cells.map(csvCell).join(","),
   );
   // BOM so Excel opens Thai text as UTF-8.
-  return Buffer.from(`﻿${lines.join("\r\n")}\r\n`, "utf8");
+  return Buffer.from(`\uFEFF${lines.join("\r\n")}\r\n`, "utf8");
 }
 
 export const exportService = {
@@ -145,12 +221,19 @@ export const exportService = {
     format: ExportFormat,
     options: { timeZone?: string; includeNames: boolean },
   ) {
-    const table = await loadResponseTable(formId, adminId, resolveTimeZone(options.timeZone), options.includeNames);
-    return format === "xlsx"
-      ? {
-          buffer: await toXlsx(table),
-          contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        }
-      : { buffer: toCsv(table), contentType: "text/csv; charset=utf-8" };
+    const timeZone = resolveTimeZone(options.timeZone);
+    if (format === "csv") {
+      const table = await loadResponseTable(formId, adminId, timeZone, options.includeNames);
+      return { buffer: toCsv(table), contentType: "text/csv; charset=utf-8" };
+    }
+
+    const [table, summary] = await Promise.all([
+      loadResponseTable(formId, adminId, timeZone, options.includeNames),
+      loadSummaryTable(formId, adminId, timeZone),
+    ]);
+    return {
+      buffer: await toXlsx(table, summary),
+      contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    };
   },
 };
