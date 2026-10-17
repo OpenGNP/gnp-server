@@ -14,6 +14,7 @@ import {
 import { parseDbTimestamp } from "../utils/timestamp";
 import { createCalendar, resolveTimeZone, type Calendar } from "../utils/timezone";
 import { requireFormAccess } from "./formAccess";
+import { loadResponseRecords } from "./responseRecords";
 
 const SENTIMENT_LABELS = ["positive", "neutral", "negative"] as const;
 
@@ -55,6 +56,8 @@ export type ThemeFeedbackPoint = {
   violation: boolean;
   quote: string;
   originalFeedback: string;
+  /** The response this came from — opens it in the Individual tab. */
+  submissionId: number;
   submittedAt: string;
   /** Who wrote it, when the form recorded names; null for anonymous submissions. */
   respondentName: string | null;
@@ -622,6 +625,24 @@ export const analyticsService = {
     return { totalResponses, demographic, feedback };
   },
 
+  /** Each submission's full set of answers, newest first — the Dashboard's Individual tab. */
+  async individualResponses(formId: number, adminId: number) {
+    const { fields, records } = await loadResponseRecords(formId, adminId);
+    return {
+      fields,
+      responses: records
+        .map((record, index) => ({
+          id: record.id,
+          /** 1 = the first response ever submitted. */
+          number: index + 1,
+          submittedAt: record.submittedAt,
+          respondentName: record.respondentName,
+          answers: Object.fromEntries(record.answers),
+        }))
+        .reverse(),
+    };
+  },
+
   /**
    * Theme analysis for one form's Dashboard "Themes" tab: overall sentiment, the
    * canonical topics its analysed feedback maps to (per-topic sentiment split,
@@ -807,6 +828,7 @@ export const analyticsService = {
         violation: Boolean(row.violation),
         quote: row.pointText ?? "",
         originalFeedback: row.originalFeedback ?? row.pointText ?? "",
+        submissionId: row.submissionId,
         submittedAt: row.submittedAt ?? new Date().toISOString(),
         respondentName: row.respondentName ?? null,
         volumeBucket: bucketOfRow.get(row) ?? null,

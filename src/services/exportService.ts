@@ -1,10 +1,9 @@
 import ExcelJS from "exceljs";
-import { asc, eq, inArray, sql } from "drizzle-orm";
 
-import { answers, db, fieldOptions, formFields, submissions, users } from "../db/client";
 import { resolveTimeZone } from "../utils/timezone";
 import { analyticsService } from "./analyticsService";
 import { requireFormAccess } from "./formAccess";
+import { loadResponseRecords } from "./responseRecords";
 
 export type ExportFormat = "xlsx" | "csv";
 
@@ -34,76 +33,17 @@ async function loadResponseTable(
   timeZone: string,
   includeNames: boolean,
 ): Promise<ResponseTable> {
-  await requireFormAccess(formId, adminId, "view");
+  const { fields, records } = await loadResponseRecords(formId, adminId);
 
-  const allFields = await db
-    .select({ id: formFields.id, label: formFields.fieldLabel, type: formFields.fieldType, deletedAt: formFields.deletedAt })
-    .from(formFields)
-    .where(eq(formFields.formId, formId))
-    .orderBy(asc(formFields.fieldOrder), asc(formFields.id));
-
-  const subs = await db
-    .select({
-      id: submissions.id,
-      createdAt: submissions.createdAt,
-      respondentName: sql<string | null>`coalesce(nullif(${submissions.respondentName}, ''), nullif(${users.fullName}, ''), ${users.email})`,
-    })
-    .from(submissions)
-    .leftJoin(users, eq(submissions.userId, users.id))
-    .where(eq(submissions.formId, formId))
-    .orderBy(asc(submissions.createdAt), asc(submissions.id));
-
-  const answerRows = subs.length
-    ? await db
-        .select({
-          submissionId: answers.submissionId,
-          fieldId: answers.fieldId,
-          text: answers.answerText,
-          option: fieldOptions.optionLabel,
-          optionOrder: fieldOptions.optionOrder,
-        })
-        .from(answers)
-        .leftJoin(fieldOptions, eq(answers.answerOptionId, fieldOptions.id))
-        .where(inArray(answers.submissionId, subs.map((sub) => sub.id)))
-        .orderBy(asc(answers.submissionId), asc(fieldOptions.optionOrder), asc(answers.id))
-    : [];
-
-  // Like the dashboard: removed questions stay while they still hold answers.
-  const answeredFields = new Set(answerRows.map((row) => row.fieldId));
-  const fields = allFields.filter((field) => !field.deletedAt || answeredFields.has(field.id));
-
-  // submissionId → fieldId → values; a free-text answer on a choice field is its "Other".
-  const choiceFields = new Set(
-    fields.filter((field) => field.type === "radio" || field.type === "checkbox").map((field) => field.id),
-  );
-  const values = new Map<number, Map<number, string[]>>();
-  for (const row of answerRows) {
-    const value = row.option ?? (row.text ? (choiceFields.has(row.fieldId) ? `Other: ${row.text}` : row.text) : null);
-    if (value === null) continue;
-    const byField = values.get(row.submissionId) ?? new Map<number, string[]>();
-    byField.set(row.fieldId, [...(byField.get(row.fieldId) ?? []), value]);
-    values.set(row.submissionId, byField);
-  }
-
-  const withNames = includeNames && subs.some((sub) => sub.respondentName);
-  const headers = [
-    "Submitted at",
-    ...(withNames ? ["Respondent"] : []),
-    ...fields.map(
-      (field, index) => `${field.label?.trim() || `Question ${index + 1}`}${field.deletedAt ? " (removed)" : ""}`,
-    ),
-  ];
-
-  const rows = subs.map((sub) => {
-    const byField = values.get(sub.id);
-    return {
-      submittedAt: sub.createdAt ? formatLocal(sub.createdAt, timeZone) : "",
-      cells: [
-        ...(withNames ? [sub.respondentName ?? ""] : []),
-        ...fields.map((field) => byField?.get(field.id)?.join(", ") ?? ""),
-      ],
-    };
-  });
+  const withNames = includeNames && records.some((record) => record.respondentName);
+  const headers = ["Submitted at", ...(withNames ? ["Respondent"] : []), ...fields.map((field) => field.title)];
+  const rows = records.map((record) => ({
+    submittedAt: record.submittedAt ? formatLocal(record.submittedAt, timeZone) : "",
+    cells: [
+      ...(withNames ? [record.respondentName ?? ""] : []),
+      ...fields.map((field) => record.answers.get(field.id)?.join(", ") ?? ""),
+    ],
+  }));
 
   return { headers, rows };
 }
