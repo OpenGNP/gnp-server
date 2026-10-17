@@ -73,6 +73,35 @@ export const analyticsRoutes = new Elysia({ prefix: "/analytics" })
     },
   )
   .get(
+    "/forms/:id/themes/export",
+    async ({ params, query, currentUser }) => {
+      assertCurrentUser(currentUser);
+      const id = parseIntParam(params.id, "form id");
+      const { buffer, contentType } = await analyticsController.exportThemes(id, currentUser.id, {
+        from: typeof query.from === "string" ? query.from : undefined,
+        to: typeof query.to === "string" ? query.to : undefined,
+        demo: typeof query.demo === "string" ? query.demo : undefined,
+        tz: typeof query.tz === "string" ? query.tz : undefined,
+        includeNames: query.names !== "0",
+      });
+      return new Response(buffer, {
+        headers: {
+          "Content-Type": contentType,
+          "Content-Disposition": 'attachment; filename="themes.xlsx"',
+          "Cache-Control": "no-store",
+        },
+      });
+    },
+    {
+      detail: {
+        tags,
+        security,
+        summary: "Download the Themes tab (AI analysis) as xlsx",
+        description: "Same from / to / demo / tz as GET /forms/:id/themes. `names=0` leaves respondent names out.",
+      },
+    },
+  )
+  .get(
     "/forms/:id/trend",
     async ({ params, query, currentUser }) => {
       assertCurrentUser(currentUser);
