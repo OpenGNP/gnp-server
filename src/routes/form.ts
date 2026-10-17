@@ -199,6 +199,33 @@ const adminFormRoutes = new Elysia()
     },
     { detail: { tags, security, summary: "Remove a form's cover image" } },
   )
+  .get(
+    "/:id/export",
+    async ({ params, query, currentUser }) => {
+      assertCurrentUser(currentUser);
+      const id = parseIntParam(params.id, "form id");
+      const format = query.format === "csv" ? "csv" : "xlsx";
+      const { buffer, contentType } = await formController.exportResponses(id, currentUser.id, format, {
+        timeZone: typeof query.tz === "string" ? query.tz : undefined,
+        includeNames: query.names !== "0",
+      });
+      return new Response(buffer, {
+        headers: {
+          "Content-Type": contentType,
+          "Content-Disposition": `attachment; filename="responses.${format}"`,
+          "Cache-Control": "no-store",
+        },
+      });
+    },
+    {
+      detail: {
+        tags,
+        security,
+        summary: "Download a form's responses as xlsx or csv",
+        description: "`format`: xlsx (default) or csv. `tz`: IANA zone for the Submitted at column (default UTC). `names=0` omits the Respondent column.",
+      },
+    },
+  )
   .patch(
     "/reorder",
     async ({ body, currentUser }) => {

@@ -1,5 +1,6 @@
 import type { CurrentUser } from "../middleware/authMiddleware";
 import { resolveFormRef } from "../services/formAccess";
+import { exportService, type ExportFormat } from "../services/exportService";
 import { formService } from "../services/formService";
 import type {
   CreateFieldOptionInput,
@@ -26,6 +27,10 @@ export const formController = {
     return formService.getPublicByToken(token, viewer, deviceId);
   },
 
+
+  exportResponses(id: number, adminId: number, format: ExportFormat, options: { timeZone?: string; includeNames: boolean }) {
+    return exportService.exportResponses(id, adminId, format, options);
+  },
 
   getCoverImageForEdit(id: number, adminId: number) {
     return formService.getCoverImageForEdit(id, adminId);
