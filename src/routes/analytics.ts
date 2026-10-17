@@ -39,6 +39,16 @@ export const analyticsRoutes = new Elysia({ prefix: "/analytics" })
     { detail: { tags, security, summary: "Per-field answer breakdown for one form (Response tab)" } },
   )
   .get(
+    "/forms/:id/individual",
+    async ({ params, currentUser }) => {
+      assertCurrentUser(currentUser);
+      const id = parseIntParam(params.id, "form id");
+      const data = await analyticsController.individualResponses(id, currentUser.id);
+      return successResponse("Individual responses loaded successfully", data);
+    },
+    { detail: { tags, security, summary: "Every submission with its answers, newest first (Individual tab)" } },
+  )
+  .get(
     "/forms/:id/themes",
     async ({ params, query, currentUser }) => {
       assertCurrentUser(currentUser);
