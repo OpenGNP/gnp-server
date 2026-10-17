@@ -1,4 +1,4 @@
-import { and, count, countDistinct, desc, eq, gte, inArray, isNotNull, lte, max, min, ne, sql } from "drizzle-orm";
+import { and, count, countDistinct, desc, eq, gte, inArray, isNotNull, isNull, lte, max, min, ne, or, sql } from "drizzle-orm";
 
 import {
   answers,
@@ -200,13 +200,21 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const parseTs = parseDbTimestamp;
 
 /**
- * Default analytics window for a form (Trend + Themes tabs share this): the span of
- * its analysed feedback, first mention → last mention, so the tab opens on *all*
- * feedback. Deliberately NOT the form's start/end date — an admin can edit those
- * after responses land. Falls back to a trailing 90 days when the form has no
- * analysed feedback yet. Explicit from/to (epoch ms) win; a degenerate/inverted
- * result is widened to 90 days.
+ * When this form's first and last responses came in — the default Themes/Trend window.
+ * Every response, not just analysed ones: a response the AI hasn't reached yet still
+ * counts toward "Total Responses", so it must fall inside the default window.
  */
+async function submissionSpan(formId: number): Promise<{ earliestMs: number; latestMs: number }> {
+  const [span] = await db
+    .select({ earliest: min(submissions.createdAt), latest: max(submissions.createdAt) })
+    .from(submissions)
+    .where(eq(submissions.formId, formId));
+  return {
+    earliestMs: span?.earliest ? parseTs(span.earliest) : NaN,
+    latestMs: span?.latest ? parseTs(span.latest) : NaN,
+  };
+}
+
 function resolveFeedbackWindow(
   opts: { from?: number; to?: number },
   earliestMs: number,
@@ -657,29 +665,17 @@ export const analyticsService = {
     const form = await requireFormAccess(formId, adminId, "view");
     const cal = createCalendar(resolveTimeZone(opts.timeZone));
 
-    // Resolve the analysis window the same way the Trend tab does: default to the
-    // span of this form's analysed feedback, explicit from/to win.
-    const [allTime] = await db
-      .select({
-        value: count(),
-        earliest: min(submissions.createdAt),
-        latest: max(submissions.createdAt),
-      })
-      .from(points)
-      .innerJoin(answers, eq(points.answerId, answers.id))
-      .innerJoin(submissions, eq(answers.submissionId, submissions.id))
-      .where(and(eq(submissions.formId, formId), ne(points.processingStatus, "pending")));
+    // Same default window as the Trend tab: every response's span; explicit from/to win.
+    const [[allTime], { earliestMs, latestMs }] = await Promise.all([
+      db
+        .select({ value: count() })
+        .from(points)
+        .innerJoin(answers, eq(points.answerId, answers.id))
+        .innerJoin(submissions, eq(answers.submissionId, submissions.id))
+        .where(and(eq(submissions.formId, formId), ne(points.processingStatus, "pending"))),
+      submissionSpan(formId),
+    ]);
     const totalMentions = allTime?.value ?? 0;
-    // Nothing analysed yet: span the submissions instead, so the responder count
-    // covers everyone who answered rather than a default 90 days.
-    const [submissionSpan] = allTime?.earliest
-      ? [allTime]
-      : await db
-          .select({ earliest: min(submissions.createdAt), latest: max(submissions.createdAt) })
-          .from(submissions)
-          .where(eq(submissions.formId, formId));
-    const earliestMs = submissionSpan?.earliest ? parseTs(submissionSpan.earliest) : NaN;
-    const latestMs = submissionSpan?.latest ? parseTs(submissionSpan.latest) : NaN;
     const { from, to } = resolveFeedbackWindow(opts, earliestMs, latestMs);
     const fromIso = new Date(from).toISOString();
     const toIso = new Date(to).toISOString();
@@ -730,6 +726,26 @@ export const analyticsService = {
     }
     const matchingSubmissions = windowSubmissions.filter((row) => matchesDemo(row.id));
     const totalResponders = matchingSubmissions.length;
+
+    // Of those, the responses the AI pipeline hasn't finished: an analysed-field answer
+    // not yet decomposed (gnp-ai's queue marker) or one with a point still pending.
+    const awaitingRows = await db
+      .selectDistinct({ id: answers.submissionId })
+      .from(answers)
+      .innerJoin(submissions, eq(answers.submissionId, submissions.id))
+      .innerJoin(formFields, eq(answers.fieldId, formFields.id))
+      .leftJoin(points, and(eq(points.answerId, answers.id), eq(points.processingStatus, "pending")))
+      .where(
+        and(
+          eq(submissions.formId, formId),
+          inWindow,
+          eq(formFields.analyzeWithAi, true),
+          isNull(formFields.deletedAt),
+          isNotNull(answers.answerText),
+          or(isNull(answers.decomposedAt), isNotNull(points.id)),
+        ),
+      );
+    const awaitingAnalysis = awaitingRows.filter((row) => matchesDemo(row.id)).length;
 
     // Responders (same date + demographic filters) on the window's last calendar day,
     // in the viewer's time zone: "today" when that is today, else that date.
@@ -900,6 +916,8 @@ export const analyticsService = {
       /** Analysed mentions across ALL time — lets the UI tell "none yet" from "none in range". */
       totalMentions,
       totalResponders,
+      /** Of `totalResponders`, how many the AI pipeline hasn't analysed yet. */
+      awaitingAnalysis,
       responderDelta: recentResponders,
       responderDeltaLabel,
       demographicFilters,
@@ -939,28 +957,24 @@ export const analyticsService = {
     await requireFormAccess(formId, adminId, "view");
     const cal = createCalendar(resolveTimeZone(opts.timeZone));
 
-    // Analysed mentions for this form across all time + when the first/last one landed —
-    // used for `totalMentions` and to anchor the default window on real data.
-    const [allTime] = await db
-      .select({
-        value: count(),
-        earliest: min(submissions.createdAt),
-        latest: max(submissions.createdAt),
-      })
-      .from(points)
-      .innerJoin(answers, eq(points.answerId, answers.id))
-      .innerJoin(submissions, eq(answers.submissionId, submissions.id))
-      .where(and(eq(submissions.formId, formId), ne(points.processingStatus, "pending")));
+    // Analysed mentions for this form across all time, and the default window — every
+    // response's span, same as the Themes tab (see submissionSpan).
+    const [[allTime], { earliestMs, latestMs }] = await Promise.all([
+      db
+        .select({ value: count() })
+        .from(points)
+        .innerJoin(answers, eq(points.answerId, answers.id))
+        .innerJoin(submissions, eq(answers.submissionId, submissions.id))
+        .where(and(eq(submissions.formId, formId), ne(points.processingStatus, "pending"))),
+      submissionSpan(formId),
+    ]);
     const totalMentions = allTime?.value ?? 0;
-    const earliestMs = allTime?.earliest ? parseTs(allTime.earliest) : NaN;
-    const latestMs = allTime?.latest ? parseTs(allTime.latest) : NaN;
 
-    // Default window = the span of this form's analysed feedback (see
-    // resolveFeedbackWindow). Explicit from/to from the date filter always win.
+    // Explicit from/to from the date filter always win (see resolveFeedbackWindow).
     const window = resolveFeedbackWindow(opts, earliestMs, latestMs);
     const { from, span } = window;
     // `to` = the end of the last selected day, so the rolling windows below cover whole
-    // days. The date filter already sends 23:59:59.999; the default ends at the last mention.
+    // days. The date filter already sends 23:59:59.999; the default ends at the last response.
     const to = Number.isFinite(opts.to) ? window.to : cal.next(cal.start(window.to, "day"), "day") - 1;
     // No explicit bucket = "auto": pick a step that gives the charts 6–12 x-axis points
     // (it can span several units, e.g. 2 weeks). `bkt` is then that step's unit, which
