@@ -1,11 +1,16 @@
 import ExcelJS from "exceljs";
 
+import { asc, eq } from "drizzle-orm";
+
+import { db, submissions } from "../db/client";
 import { resolveTimeZone } from "../utils/timezone";
 import { analyticsService } from "./analyticsService";
 import { requireFormAccess } from "./formAccess";
 import { loadResponseRecords } from "./responseRecords";
 
 export type ExportFormat = "xlsx" | "csv";
+
+const XLSX_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
 type ResponseTable = { headers: string[]; rows: { submittedAt: string; cells: string[] }[] };
 
@@ -89,6 +94,19 @@ async function loadSummaryTable(formId: number, adminId: number, timeZone: strin
   };
 }
 
+/** The exports' table header: white bold on the brand blue. */
+function styleHeader(row: ExcelJS.Row) {
+  row.font = { bold: true, color: { argb: "FFFFFFFF" } };
+  row.eachCell((cell) => {
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1E55C5" } };
+  });
+}
+
+/** The instant's wall clock in `timeZone` as a Date read as UTC — Excel then shows that local time. */
+function localDate(iso: string, timeZone: string): Date {
+  return new Date(`${formatLocal(iso, timeZone).replace(" ", "T")}Z`);
+}
+
 function addResponsesSheet(workbook: ExcelJS.Workbook, table: ResponseTable) {
   const sheet = workbook.addWorksheet("Responses", { views: [{ state: "frozen", ySplit: 1 }] });
 
@@ -122,11 +140,7 @@ function addSummarySheet(workbook: ExcelJS.Workbook, summary: SummaryTable) {
     sheet.addRow([question.title]).font = { bold: true };
     if (question.note) sheet.addRow([question.note]).font = { italic: true, color: { argb: "FF6B7280" } };
 
-    const header = sheet.addRow(["Option", "Count", "%"]);
-    header.font = { bold: true, color: { argb: "FFFFFFFF" } };
-    header.eachCell((cell) => {
-      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1E55C5" } };
-    });
+    styleHeader(sheet.addRow(["Option", "Count", "%"]));
     for (const row of question.rows) {
       sheet.addRow([row.label, row.count, row.share]).getCell(3).numFmt = "0%";
     }
@@ -137,6 +151,180 @@ async function toXlsx(table: ResponseTable, summary: SummaryTable): Promise<Buff
   const workbook = new ExcelJS.Workbook();
   addResponsesSheet(workbook, table);
   addSummarySheet(workbook, summary);
+  return Buffer.from(await workbook.xlsx.writeBuffer());
+}
+
+// ── Themes (AI analysis) ─────────────────────────────────────────────────
+
+type Cell = string | number | Date;
+
+type ThemesTables = {
+  /** Label / value rows: the form, the filters the numbers were taken under, totals. */
+  summary: [string, Cell][];
+  topics: { headers: string[]; rows: Cell[][] };
+  feedback: { headers: string[]; rows: Cell[][] };
+};
+
+type ThemesExportOptions = {
+  from?: number;
+  to?: number;
+  demo?: Record<string, string[]>;
+  timeZone?: string;
+  includeNames: boolean;
+};
+
+/**
+ * The Themes tab as tables, under the same date range and demographic filter the
+ * viewer has on screen — from analyticsService.formThemes, so the numbers match.
+ */
+async function loadThemesTables(formId: number, adminId: number, opts: ThemesExportOptions): Promise<ThemesTables> {
+  const timeZone = resolveTimeZone(opts.timeZone);
+  const [form, themes, order] = await Promise.all([
+    requireFormAccess(formId, adminId, "view"),
+    analyticsService.formThemes(formId, adminId, { from: opts.from, to: opts.to, demo: opts.demo, timeZone }),
+    // "Response #" as the Individual tab numbers them: 1 = the first submitted.
+    db
+      .select({ id: submissions.id })
+      .from(submissions)
+      .where(eq(submissions.formId, formId))
+      .orderBy(asc(submissions.createdAt), asc(submissions.id)),
+  ]);
+  const responseNumber = new Map(order.map((row, index) => [row.id, index + 1]));
+  const topics = themes.aiDiscoveredTopics;
+  const share = (part: number, whole: number) => (whole > 0 ? part / whole : 0);
+
+  const demoFilter = Object.entries(opts.demo ?? {})
+    .filter(([, values]) => values.length > 0)
+    .map(([label, values]) => `${label} = ${values.join(", ")}`)
+    .join("; ");
+  const { negative, neutral, positive } = themes.sentiment;
+  const analysed = negative + neutral + positive;
+
+  const summary: [string, Cell][] = [
+    ["Form", form.formTitle?.trim() || "Untitled form"],
+    ["Date range", themes.rangeLabel],
+    ["Respondents", demoFilter || "Everyone"],
+    ["Exported at", formatLocal(new Date().toISOString(), timeZone)],
+    ["Responders in range", themes.totalResponders],
+    ["Analysed feedback", analysed],
+    ["Negative", share(negative, analysed)],
+    ["Neutral", share(neutral, analysed)],
+    ["Positive", share(positive, analysed)],
+    ["Flagged as violation", topics.reduce((sum, topic) => sum + topic.feedbackSegment.filter((p) => p.violation).length, 0)],
+  ];
+
+  const topicRows = topics.map((topic) => {
+    const mentions = topic.negative + topic.neutral + topic.positive;
+    return [
+      topic.label,
+      mentions,
+      topic.percentOfTotal / 100,
+      topic.negative,
+      share(topic.negative, mentions),
+      topic.neutral,
+      share(topic.neutral, mentions),
+      topic.positive,
+      share(topic.positive, mentions),
+      topic.feedbackSegment.filter((point) => point.violation).length,
+      topic.keywords.map((keyword) => keyword.text).join(", "),
+      topic.aiSummary,
+    ];
+  });
+
+  // One column per demographic question, so Excel can filter and pivot on it.
+  const demoLabels = themes.demographicFilters.map((group) => group.label);
+  const points = topics.flatMap((topic) => topic.feedbackSegment.map((point) => ({ topic: topic.label, point })));
+  const withNames = opts.includeNames && points.some(({ point }) => point.respondentName);
+  const feedbackRows = points.map(({ topic, point }) => [
+    topic,
+    point.sentiment,
+    point.violation ? "Yes" : "No",
+    point.quote,
+    point.originalFeedback,
+    localDate(point.submittedAt, timeZone),
+    responseNumber.get(point.submissionId) ?? "",
+    ...(withNames ? [point.respondentName ?? ""] : []),
+    ...demoLabels.map((label) => point.demographics.find((demo) => demo.label === label)?.value ?? ""),
+  ]);
+
+  return {
+    summary,
+    topics: {
+      headers: [
+        "Topic",
+        "Mentions",
+        "% of total",
+        "Negative",
+        "Negative %",
+        "Neutral",
+        "Neutral %",
+        "Positive",
+        "Positive %",
+        "Violations",
+        "Keywords",
+        "AI summary",
+      ],
+      rows: topicRows,
+    },
+    feedback: {
+      headers: [
+        "Topic",
+        "Sentiment",
+        "Violation",
+        "AI quote",
+        "Original feedback",
+        "Submitted at",
+        "Response #",
+        ...(withNames ? ["Respondent"] : []),
+        ...demoLabels,
+      ],
+      rows: feedbackRows,
+    },
+  };
+}
+
+function addThemesSummarySheet(workbook: ExcelJS.Workbook, summary: ThemesTables["summary"]) {
+  const sheet = workbook.addWorksheet("Summary");
+  sheet.columns = [{ width: 24 }, { width: 48 }];
+  for (const [label, value] of summary) {
+    const row = sheet.addRow([label, value]);
+    row.getCell(1).font = { bold: true };
+    if (["Negative", "Neutral", "Positive"].includes(label)) row.getCell(2).numFmt = "0%";
+    row.getCell(2).alignment = { horizontal: "left", wrapText: true };
+  }
+}
+
+/** A header row + data, frozen header, widths from the content; `formats` by 1-based column. */
+function addTableSheet(
+  workbook: ExcelJS.Workbook,
+  name: string,
+  table: { headers: string[]; rows: Cell[][] },
+  formats: Record<number, string> = {},
+) {
+  const sheet = workbook.addWorksheet(name, { views: [{ state: "frozen", ySplit: 1 }] });
+  styleHeader(sheet.addRow(table.headers));
+  for (const row of table.rows) sheet.addRow(row);
+
+  for (const [column, format] of Object.entries(formats)) sheet.getColumn(Number(column)).numFmt = format;
+  table.headers.forEach((header, index) => {
+    const longest = Math.max(
+      header.length,
+      ...table.rows.map((row) => {
+        const cell = row[index];
+        return cell instanceof Date ? 19 : String(cell ?? "").length;
+      }),
+    );
+    const column = sheet.getColumn(index + 1);
+    column.width = Math.min(Math.max(longest + 2, 10), 60);
+    if (longest > 60) column.alignment = { wrapText: true, vertical: "top" };
+  });
+}
+
+async function themesToXlsx(tables: ThemesTables): Promise<Buffer> {
+  const workbook = new ExcelJS.Workbook();
+  addThemesSummarySheet(workbook, tables.summary);
+  addTableSheet(workbook, "Topics", tables.topics, { 3: "0%", 5: "0%", 7: "0%", 9: "0%" });
+  addTableSheet(workbook, "Feedback", tables.feedback, { 6: "yyyy-mm-dd hh:mm:ss" });
   return Buffer.from(await workbook.xlsx.writeBuffer());
 }
 
@@ -171,9 +359,12 @@ export const exportService = {
       loadResponseTable(formId, adminId, timeZone, options.includeNames),
       loadSummaryTable(formId, adminId, timeZone),
     ]);
-    return {
-      buffer: await toXlsx(table, summary),
-      contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    };
+    return { buffer: await toXlsx(table, summary), contentType: XLSX_TYPE };
+  },
+
+  /** The Themes tab (AI analysis) as xlsx: Summary, Topics, Feedback. */
+  async exportThemes(formId: number, adminId: number, options: ThemesExportOptions) {
+    const tables = await loadThemesTables(formId, adminId, options);
+    return { buffer: await themesToXlsx(tables), contentType: XLSX_TYPE };
   },
 };
