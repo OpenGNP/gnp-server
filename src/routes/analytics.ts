@@ -82,6 +82,7 @@ export const analyticsRoutes = new Elysia({ prefix: "/analytics" })
         to: typeof query.to === "string" ? query.to : undefined,
         demo: typeof query.demo === "string" ? query.demo : undefined,
         tz: typeof query.tz === "string" ? query.tz : undefined,
+        sort: typeof query.sort === "string" ? query.sort : undefined,
         includeNames: query.names !== "0",
       });
       return new Response(buffer, {
@@ -97,7 +98,8 @@ export const analyticsRoutes = new Elysia({ prefix: "/analytics" })
         tags,
         security,
         summary: "Download the Themes tab (AI analysis) as xlsx",
-        description: "Same from / to / demo / tz as GET /forms/:id/themes. `names=0` leaves respondent names out.",
+        description: "Same from / to / demo / tz as GET /forms/:id/themes. `sort`: priority (default) / negative / mentions / positive, " +
+          "Priority puts violation topics first. `names=0` leaves respondent names out.",
       },
     },
   )
