@@ -117,7 +117,7 @@ export const feedbackService = {
     });
 
     // 404, not 403, so a submission id can't be probed for whether it exists.
-    if (!submission || !canAccessForm(submission.form, adminId, "view")) {
+    if (!submission || !(await canAccessForm(submission.form, adminId, "view"))) {
       throw notFound("Submission not found");
     }
 

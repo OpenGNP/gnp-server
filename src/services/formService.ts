@@ -6,7 +6,7 @@ import type { CurrentUser } from "../middleware/authMiddleware";
 import { badRequest, forbidden, notFound, unauthorized } from "../utils/errors";
 import { anonymousIdentityCode } from "../utils/helper";
 import { parseDbTimestamp } from "../utils/timestamp";
-import { requireFormAccess } from "./formAccess";
+import { formRoleFor, requireFormAccess } from "./formAccess";
 import type {
   CreateFieldOptionInput,
   CreateFormFieldInput,
@@ -419,7 +419,8 @@ export const formService = {
   },
 
   async getForEdit(id: number, adminId: number) {
-    await requireFormAccess(id, adminId, "view");
+    const access = await requireFormAccess(id, adminId, "view");
+    const role = await formRoleFor(access, adminId);
 
     const form = await db.query.forms.findFirst({
       where: eq(forms.id, id),
@@ -441,7 +442,18 @@ export const formService = {
       },
     });
 
-    return syncExpiredAcceptingResponses(form!);
+    const synced = await syncExpiredAcceptingResponses(form!);
+    const [owner] = await db
+      .select({ name: sql<string>`coalesce(nullif(${users.fullName}, ''), ${users.email})` })
+      .from(users)
+      .where(eq(users.id, synced.adminId));
+    // Viewers see the form and its dashboard, not who it's restricted to.
+    return {
+      ...synced,
+      role,
+      ownerName: owner?.name ?? null,
+      formAllowedUsers: role === "owner" ? synced.formAllowedUsers : [],
+    };
   },
 
   /**
