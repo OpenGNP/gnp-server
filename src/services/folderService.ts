@@ -1,8 +1,10 @@
-import { and, count, desc, eq, isNull, max } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNull, max, sql } from "drizzle-orm";
 
 import { db, folders, forms } from "../db/client";
+import { removeObjectSafely } from "../lib/minio";
 import { badRequest, forbidden, isUniqueViolation, notFound } from "../utils/errors";
 import type { CreateFolderInput, UpdateFolderInput } from "../validators/folderValidator";
+import { isManagedCoverKey } from "./formService";
 
 const nowIso = () => new Date().toISOString();
 
@@ -116,15 +118,38 @@ export const folderService = {
   },
 
   /** Deletes the folder only: its subfolders and forms move up to its parent (as the app shows). */
+  /**
+   * Deletes the folder and everything in it — its subfolders at any depth and every
+   * form in them, with their responses (forms cascade to their fields and submissions;
+   * subfolders cascade via fk_folder_parent).
+   */
   async remove(id: number, adminId: number) {
-    const folder = await getOwnedFolder(id, adminId);
-    await db
-      .transaction(async (tx) => {
-        await tx.update(folders).set({ parentFolderId: folder.parentFolderId }).where(eq(folders.parentFolderId, id));
-        await tx.update(forms).set({ folderId: folder.parentFolderId }).where(eq(forms.folderId, id));
-        await tx.delete(folders).where(eq(folders.id, id));
-      })
-      .catch(rethrowDuplicateName);
+    await getOwnedFolder(id, adminId);
+
+    const subtree = await db.execute<{ id: number }>(sql`
+      with recursive tree as (
+        select id from folders where id = ${id}
+        union all
+        select f.id from folders f join tree on f.parent_folder_id = tree.id
+      )
+      select id from tree`);
+    const folderIds = [...subtree].map((row) => Number(row.id));
+
+    const doomed = await db
+      .select({ id: forms.id, coverImageUrl: forms.coverImageUrl })
+      .from(forms)
+      .where(and(inArray(forms.folderId, folderIds), eq(forms.adminId, adminId)));
+
+    await db.transaction(async (tx) => {
+      if (doomed.length) await tx.delete(forms).where(inArray(forms.id, doomed.map((form) => form.id)));
+      await tx.delete(folders).where(eq(folders.id, id));
+    });
+
+    // Rows are gone; their MinIO covers aren't — clean those up too.
+    await Promise.all(
+      doomed.map((form) => (isManagedCoverKey(form.coverImageUrl) ? removeObjectSafely(form.coverImageUrl) : null)),
+    );
+    return { deletedForms: doomed.length, deletedFolders: folderIds.length };
   },
 
   /** Reorders the folders inside one parent (null = top level). */

@@ -187,7 +187,7 @@ async function hasSubmissions(formId: number) {
  * the old inline-data-URL scheme, which is neither fetchable from MinIO nor safe
  * to pass to `removeObject`.
  */
-function isManagedCoverKey(value: string | null): value is string {
+export function isManagedCoverKey(value: string | null): value is string {
   return typeof value === "string" && value.startsWith("covers/");
 }
 
