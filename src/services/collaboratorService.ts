@@ -1,6 +1,6 @@
 import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
 
-import { db, formCollaborators, forms, users } from "../db/client";
+import { db, formCollaborators, formOpens, forms, users } from "../db/client";
 import { badRequest } from "../utils/errors";
 import { requireFormAccess } from "./formAccess";
 
@@ -81,10 +81,14 @@ export const collaboratorService = {
         status: forms.status,
         updatedAt: forms.updatedAt,
         ownerName: sql<string | null>`coalesce(nullif(${users.fullName}, ''), ${users.email})`,
+        ownerEmail: users.email,
+        sharedAt: formCollaborators.createdAt,
+        lastOpenedAt: formOpens.openedAt,
       })
       .from(formCollaborators)
       .innerJoin(forms, eq(formCollaborators.formId, forms.id))
       .innerJoin(users, eq(forms.adminId, users.id))
+      .leftJoin(formOpens, and(eq(formOpens.formId, forms.id), eq(formOpens.userId, userId)))
       .where(
         and(
           sql`${forms.status} <> 'archived'`,

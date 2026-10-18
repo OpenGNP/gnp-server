@@ -1,6 +1,6 @@
 import { and, count, desc, eq, inArray, isNull, max, or, sql, type SQL } from "drizzle-orm";
 
-import { db, fieldOptions, folders, formAllowedUsers, formFields, forms, submissions, users } from "../db/client";
+import { db, fieldOptions, folders, formAllowedUsers, formFields, formOpens, forms, submissions, users } from "../db/client";
 import { contentTypeForKey, extensionForMimeType, getObjectBuffer, putObject, removeObjectSafely } from "../lib/minio";
 import type { CurrentUser } from "../middleware/authMiddleware";
 import { badRequest, forbidden, notFound, unauthorized } from "../utils/errors";
@@ -409,13 +409,25 @@ export const formService = {
         endDate: forms.endDate,
         createdAt: forms.createdAt,
         updatedAt: forms.updatedAt,
+        /** When this user last opened it (editor or dashboard); null if never. */
+        lastOpenedAt: sql<string | null>`max(${formOpens.openedAt})`,
         submissionCount: count(submissions.id),
       })
       .from(forms)
       .leftJoin(submissions, eq(submissions.formId, forms.id))
+      .leftJoin(formOpens, and(eq(formOpens.formId, forms.id), eq(formOpens.userId, adminId)))
       .where(and(...conditions))
       .groupBy(forms.id)
       .orderBy(desc(forms.updatedAt));
+  },
+
+  /** Records that `userId` opened the form (editor or dashboard) — for "Date opened" sorting. */
+  async recordOpen(id: number, userId: number) {
+    await requireFormAccess(id, userId, "view");
+    await db
+      .insert(formOpens)
+      .values({ userId, formId: id })
+      .onConflictDoUpdate({ target: [formOpens.userId, formOpens.formId], set: { openedAt: sql`now()` } });
   },
 
   async getForEdit(id: number, adminId: number) {
@@ -444,7 +456,7 @@ export const formService = {
 
     const synced = await syncExpiredAcceptingResponses(form!);
     const [owner] = await db
-      .select({ name: sql<string>`coalesce(nullif(${users.fullName}, ''), ${users.email})` })
+      .select({ name: sql<string>`coalesce(nullif(${users.fullName}, ''), ${users.email})`, email: users.email })
       .from(users)
       .where(eq(users.id, synced.adminId));
     // Viewers see the form and its dashboard, not who it's restricted to.
@@ -452,6 +464,7 @@ export const formService = {
       ...synced,
       role,
       ownerName: owner?.name ?? null,
+      ownerEmail: owner?.email ?? null,
       formAllowedUsers: role === "owner" ? synced.formAllowedUsers : [],
     };
   },

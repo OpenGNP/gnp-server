@@ -103,6 +103,16 @@ const adminFormRoutes = new Elysia()
     },
     { detail: { tags, security, summary: "Forms shared with me to view" } },
   )
+  .post(
+    "/:id/open",
+    async ({ params, currentUser }) => {
+      assertCurrentUser(currentUser);
+      const id = parseIntParam(params.id, "form id");
+      await formController.recordOpen(id, currentUser.id);
+      return successResponse("Open recorded", null);
+    },
+    { detail: { tags, security, summary: "Record that I opened this form (for Date opened sorting)" } },
+  )
   .get(
     "/:id/collaborators",
     async ({ params, currentUser }) => {
