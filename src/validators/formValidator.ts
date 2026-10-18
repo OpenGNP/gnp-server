@@ -131,3 +131,9 @@ export type CreateFieldOptionInput = z.infer<typeof createFieldOptionSchema>;
 export type FormFieldInput = z.infer<typeof formFieldSchema>;
 export type ReorderFormsInput = z.infer<typeof reorderFormsSchema>;
 export type UploadCoverImageInput = z.infer<typeof uploadCoverImageSchema>;
+
+/** The full viewer list for PUT /forms/:id/collaborators (replaces what's there). */
+export const replaceCollaboratorsSchema = z.object({
+  emails: z.array(z.email().trim().toLowerCase()).max(50),
+});
+export type ReplaceCollaboratorsInput = z.infer<typeof replaceCollaboratorsSchema>;

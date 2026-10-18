@@ -9,6 +9,7 @@ import {
   createFormFieldSchema,
   createFormSchema,
   reorderFieldsSchema,
+  replaceCollaboratorsSchema,
   reorderFormsSchema,
   updateFormFieldSchema,
   updateFormSchema,
@@ -91,6 +92,43 @@ const adminFormRoutes = new Elysia()
     {
       body: createFormSchema,
       detail: { tags, security, summary: "Create a form, optionally with fields and options" },
+    },
+  )
+  .get(
+    "/shared",
+    async ({ currentUser }) => {
+      assertCurrentUser(currentUser);
+      const data = await formController.listShared(currentUser.id);
+      return successResponse("Shared forms loaded successfully", data);
+    },
+    { detail: { tags, security, summary: "Forms shared with me to view" } },
+  )
+  .get(
+    "/:id/collaborators",
+    async ({ params, currentUser }) => {
+      assertCurrentUser(currentUser);
+      const id = parseIntParam(params.id, "form id");
+      const data = await formController.listCollaborators(id, currentUser.id);
+      return successResponse("Collaborators loaded successfully", data);
+    },
+    { detail: { tags, security, summary: "Who this form is shared with (owner only)" } },
+  )
+  .put(
+    "/:id/collaborators",
+    async ({ params, body, currentUser }) => {
+      assertCurrentUser(currentUser);
+      const id = parseIntParam(params.id, "form id");
+      const data = await formController.replaceCollaborators(id, currentUser.id, body.emails);
+      return successResponse("Sharing updated successfully", data);
+    },
+    {
+      body: replaceCollaboratorsSchema,
+      detail: {
+        tags,
+        security,
+        summary: "Replace who this form is shared with (owner only)",
+        description: "Viewers can open the form's dashboard and exports, but not edit, share or delete it.",
+      },
     },
   )
   .get(

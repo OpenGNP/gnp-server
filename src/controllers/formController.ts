@@ -1,5 +1,6 @@
 import type { CurrentUser } from "../middleware/authMiddleware";
 import { resolveFormRef } from "../services/formAccess";
+import { collaboratorService } from "../services/collaboratorService";
 import { exportService, type ExportFormat } from "../services/exportService";
 import { formService } from "../services/formService";
 import type {
@@ -14,6 +15,18 @@ import type {
 export const formController = {
   list(adminId: number, folderId?: number) {
     return formService.listByAdmin(adminId, folderId);
+  },
+
+  listShared(userId: number) {
+    return collaboratorService.sharedWith(userId);
+  },
+
+  listCollaborators(id: number, adminId: number) {
+    return collaboratorService.list(id, adminId);
+  },
+
+  replaceCollaborators(id: number, adminId: number, emails: string[]) {
+    return collaboratorService.replace(id, adminId, emails);
   },
 
   resolveRef(ref: string, adminId: number) {
