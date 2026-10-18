@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm/relations";
-import { organizations, users, forms, formFields, folders, fieldOptions, submissions, answers, canonicalTopics, formAllowedUsers, points, aiModelRuns } from "./schema";
+import { organizations, users, forms, formFields, folders, fieldOptions, submissions, answers, canonicalTopics, formAllowedUsers, points, aiModelRuns, formCollaborators } from "./schema";
 
 export const usersRelations = relations(users, ({one, many}) => ({
 	organization: one(organizations, {
@@ -10,6 +10,12 @@ export const usersRelations = relations(users, ({one, many}) => ({
 	folders: many(folders),
 	submissions: many(submissions),
 	formAllowedUsers: many(formAllowedUsers),
+	formCollaborators_userId: many(formCollaborators, {
+		relationName: "formCollaborators_userId_users_id"
+	}),
+	formCollaborators_invitedBy: many(formCollaborators, {
+		relationName: "formCollaborators_invitedBy_users_id"
+	}),
 }));
 
 export const organizationsRelations = relations(organizations, ({many}) => ({
@@ -44,6 +50,7 @@ export const formsRelations = relations(forms, ({one, many}) => ({
 	canonicalTopics: many(canonicalTopics),
 	formAllowedUsers: many(formAllowedUsers),
 	aiModelRuns: many(aiModelRuns),
+	formCollaborators: many(formCollaborators),
 }));
 
 export const foldersRelations = relations(folders, ({one, many}) => ({
@@ -132,5 +139,22 @@ export const aiModelRunsRelations = relations(aiModelRuns, ({one}) => ({
 	form: one(forms, {
 		fields: [aiModelRuns.formId],
 		references: [forms.id]
+	}),
+}));
+
+export const formCollaboratorsRelations = relations(formCollaborators, ({one}) => ({
+	form: one(forms, {
+		fields: [formCollaborators.formId],
+		references: [forms.id]
+	}),
+	user_userId: one(users, {
+		fields: [formCollaborators.userId],
+		references: [users.id],
+		relationName: "formCollaborators_userId_users_id"
+	}),
+	user_invitedBy: one(users, {
+		fields: [formCollaborators.invitedBy],
+		references: [users.id],
+		relationName: "formCollaborators_invitedBy_users_id"
 	}),
 }));
