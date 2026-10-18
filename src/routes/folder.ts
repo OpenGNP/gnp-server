@@ -58,7 +58,7 @@ export const folderRoutes = new Elysia({ prefix: "/folders" })
       await folderController.remove(id, currentUser.id);
       return successResponse("Folder deleted successfully", null);
     },
-    { detail: { tags, security, summary: "Delete a folder" } },
+    { detail: { tags, security, summary: "Delete a folder and everything in it (subfolders, forms, responses)" } },
   )
   .patch(
     "/reorder",
