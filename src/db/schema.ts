@@ -294,3 +294,34 @@ export const aiModelRuns = pgTable("ai_model_runs", {
 		}).onDelete("cascade"),
 	check("chk_run_status", sql`(status)::text = ANY ((ARRAY['running'::character varying, 'completed'::character varying, 'failed'::character varying])::text[])`),
 ]);
+
+export const formCollaborators = pgTable("form_collaborators", {
+	id: serial().primaryKey().notNull(),
+	formId: integer("form_id").notNull(),
+	userId: integer("user_id"),
+	email: varchar({ length: 255 }).notNull(),
+	role: varchar({ length: 20 }).default('viewer').notNull(),
+	invitedBy: integer("invited_by"),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).default(sql`CURRENT_TIMESTAMP`),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).default(sql`CURRENT_TIMESTAMP`).notNull(),
+}, (table) => [
+	index("idx_form_collaborators_email").using("btree", sql`lower((email)::text)`),
+	index("idx_form_collaborators_user_id").using("btree", table.userId.asc().nullsLast().op("int4_ops")),
+	uniqueIndex("uq_form_collaborator_email").using("btree", sql`form_id`, sql`lower((email)::text)`),
+	foreignKey({
+			columns: [table.formId],
+			foreignColumns: [forms.id],
+			name: "fk_collaborator_form"
+		}).onDelete("cascade"),
+	foreignKey({
+			columns: [table.userId],
+			foreignColumns: [users.id],
+			name: "fk_collaborator_user"
+		}).onDelete("cascade"),
+	foreignKey({
+			columns: [table.invitedBy],
+			foreignColumns: [users.id],
+			name: "fk_collaborator_inviter"
+		}).onDelete("set null"),
+	check("chk_collaborator_role", sql`(role)::text = 'viewer'::text`),
+]);
