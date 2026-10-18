@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm/relations";
-import { organizations, users, forms, formFields, folders, fieldOptions, submissions, answers, canonicalTopics, formAllowedUsers, points, aiModelRuns, formCollaborators } from "./schema";
+import { organizations, users, forms, formFields, folders, fieldOptions, submissions, answers, canonicalTopics, formAllowedUsers, points, aiModelRuns, formCollaborators, formOpens } from "./schema";
 
 export const usersRelations = relations(users, ({one, many}) => ({
 	organization: one(organizations, {
@@ -16,6 +16,7 @@ export const usersRelations = relations(users, ({one, many}) => ({
 	formCollaborators_invitedBy: many(formCollaborators, {
 		relationName: "formCollaborators_invitedBy_users_id"
 	}),
+	formOpens: many(formOpens),
 }));
 
 export const organizationsRelations = relations(organizations, ({many}) => ({
@@ -51,6 +52,7 @@ export const formsRelations = relations(forms, ({one, many}) => ({
 	formAllowedUsers: many(formAllowedUsers),
 	aiModelRuns: many(aiModelRuns),
 	formCollaborators: many(formCollaborators),
+	formOpens: many(formOpens),
 }));
 
 export const foldersRelations = relations(folders, ({one, many}) => ({
@@ -156,5 +158,16 @@ export const formCollaboratorsRelations = relations(formCollaborators, ({one}) =
 		fields: [formCollaborators.invitedBy],
 		references: [users.id],
 		relationName: "formCollaborators_invitedBy_users_id"
+	}),
+}));
+
+export const formOpensRelations = relations(formOpens, ({one}) => ({
+	user: one(users, {
+		fields: [formOpens.userId],
+		references: [users.id]
+	}),
+	form: one(forms, {
+		fields: [formOpens.formId],
+		references: [forms.id]
 	}),
 }));

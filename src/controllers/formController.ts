@@ -17,6 +17,10 @@ export const formController = {
     return formService.listByAdmin(adminId, folderId);
   },
 
+  recordOpen(id: number, userId: number) {
+    return formService.recordOpen(id, userId);
+  },
+
   listShared(userId: number) {
     return collaboratorService.sharedWith(userId);
   },

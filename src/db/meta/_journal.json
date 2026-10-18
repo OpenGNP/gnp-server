@@ -43,6 +43,13 @@
       "when": 1792356433351,
       "tag": "0005_melted_martin_li",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792362937613,
+      "tag": "0006_yellow_apocalypse",
+      "breakpoints": true
     }
   ]
 }

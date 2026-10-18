@@ -1,4 +1,4 @@
-import { pgTable, serial, varchar, timestamp, index, foreignKey, unique, check, integer, boolean, uniqueIndex, text, uuid, vector, real } from "drizzle-orm/pg-core"
+import { pgTable, serial, varchar, timestamp, index, foreignKey, unique, check, integer, boolean, uniqueIndex, text, uuid, vector, real, primaryKey } from "drizzle-orm/pg-core"
 import { sql } from "drizzle-orm"
 
 
@@ -324,4 +324,23 @@ export const formCollaborators = pgTable("form_collaborators", {
 			name: "fk_collaborator_inviter"
 		}).onDelete("set null"),
 	check("chk_collaborator_role", sql`(role)::text = 'viewer'::text`),
+]);
+
+export const formOpens = pgTable("form_opens", {
+	userId: integer("user_id").notNull(),
+	formId: integer("form_id").notNull(),
+	openedAt: timestamp("opened_at", { withTimezone: true, mode: 'string' }).default(sql`CURRENT_TIMESTAMP`).notNull(),
+}, (table) => [
+	index("idx_form_opens_user_recent").using("btree", table.userId.asc().nullsLast().op("int4_ops"), table.openedAt.desc().nullsFirst().op("int4_ops")),
+	foreignKey({
+			columns: [table.userId],
+			foreignColumns: [users.id],
+			name: "fk_open_user"
+		}).onDelete("cascade"),
+	foreignKey({
+			columns: [table.formId],
+			foreignColumns: [forms.id],
+			name: "fk_open_form"
+		}).onDelete("cascade"),
+	primaryKey({ columns: [table.formId, table.userId], name: "form_opens_pkey"}),
 ]);
