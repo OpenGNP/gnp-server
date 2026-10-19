@@ -1,6 +1,8 @@
 import { Elysia } from "elysia";
 
 import { formController } from "../controllers/formController";
+import { formEventStream } from "../lib/formEvents";
+import { requireFormAccess } from "../services/formAccess";
 import { assertCurrentUser, optionalAuth, requireAuth } from "../middleware/authMiddleware";
 import { parseIntParam } from "../utils/params";
 import { successResponse } from "../utils/response";
@@ -102,6 +104,26 @@ const adminFormRoutes = new Elysia()
       return successResponse("Shared forms loaded successfully", data);
     },
     { detail: { tags, security, summary: "Forms shared with me to view" } },
+  )
+  .get(
+    "/:id/events",
+    async ({ params, currentUser, request }) => {
+      assertCurrentUser(currentUser);
+      const id = parseIntParam(params.id, "form id");
+      await requireFormAccess(id, currentUser.id, "view");
+      return formEventStream(id, request.signal);
+    },
+    {
+      detail: {
+        tags,
+        security,
+        summary: "Live changes to this form (Server-Sent Events)",
+        description:
+          "Events: `response` (new submission), `analysis` (gnp-ai finished a run), `form` (form edited / " +
+          "opened / closed). Data is empty — refetch what the event names. Auth via the auth cookie, since " +
+          "EventSource can't send headers.",
+      },
+    },
   )
   .post(
     "/:id/open",

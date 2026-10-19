@@ -5,7 +5,8 @@ import { env } from "../config/env";
 import * as relations from "./relations";
 import * as schema from "./schema";
 
-const queryClient = postgres(env.DATABASE_URL);
+/** The raw postgres.js client — for LISTEN (lib/formEvents.ts); queries go through `db`. */
+export const queryClient = postgres(env.DATABASE_URL);
 
 export const db = drizzle(queryClient, { schema: { ...schema, ...relations } });
 
