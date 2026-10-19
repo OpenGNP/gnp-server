@@ -1,6 +1,7 @@
 import { and, count, countDistinct, desc, eq, gte, inArray, isNotNull, isNull, lte, max, min, ne, or, sql } from "drizzle-orm";
 
 import {
+  aiModelRuns,
   answers,
   canonicalTopics,
   db,
@@ -11,7 +12,7 @@ import {
   submissions,
   users,
 } from "../db/client";
-import { parseDbTimestamp } from "../utils/timestamp";
+import { normalizeDbTimestamp, parseDbTimestamp } from "../utils/timestamp";
 import { createCalendar, resolveTimeZone, type Calendar } from "../utils/timezone";
 import { requireFormAccess } from "./formAccess";
 import { loadResponseRecords } from "./responseRecords";
@@ -548,10 +549,12 @@ export const analyticsService = {
       .orderBy(fieldOptions.optionOrder);
 
     const [totals] = await db
-      .select({ value: count() })
+      .select({ value: count(), latest: max(submissions.createdAt) })
       .from(submissions)
       .where(eq(submissions.formId, formId));
     const totalResponses = totals?.value ?? 0;
+    /** When the newest response came in — the Response tab's "Last response". */
+    const lastResponseAt = totals?.latest ? normalizeDbTimestamp(totals.latest) : null;
 
     // How many times each option was picked (across every choice field).
     const optionCountRows = await db
@@ -630,7 +633,7 @@ export const analyticsService = {
       (field.section === "demographic" ? demographic : feedback).push(breakdown);
     }
 
-    return { totalResponses, demographic, feedback };
+    return { totalResponses, lastResponseAt, demographic, feedback };
   },
 
   /** Each submission's full set of answers, newest first — the Dashboard's Individual tab. */
@@ -909,10 +912,18 @@ export const analyticsService = {
         )
       : null;
 
+    // When gnp-ai last finished a clustering run for this form (ai_model_runs is written
+    // once per completed run) — the Themes/Trend "AI analysed" time.
+    const [lastRun] = await db
+      .select({ at: max(aiModelRuns.completedAt) })
+      .from(aiModelRuns)
+      .where(and(eq(aiModelRuns.formId, formId), eq(aiModelRuns.status, "completed")));
+
     return {
       from: fromIso,
       to: toIso,
       rangeLabel,
+      lastAnalysedAt: lastRun?.at ? normalizeDbTimestamp(lastRun.at) : null,
       /** Analysed mentions across ALL time — lets the UI tell "none yet" from "none in range". */
       totalMentions,
       totalResponders,
