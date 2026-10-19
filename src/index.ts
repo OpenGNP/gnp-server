@@ -9,6 +9,7 @@ import { formRoutes } from "./routes/form";
 import { feedbackRoutes } from "./routes/feedback";
 import { topicRoutes } from "./routes/topic";
 import { analyticsRoutes } from "./routes/analytics";
+import { eventRoutes } from "./routes/events";
 
 import { databaseConfig } from "./config/database";
 import { checkDatabase } from "./db/client";
@@ -49,6 +50,7 @@ const app = new Elysia()
       .use(organizationRoutes)
       .use(folderRoutes)
       .use(formRoutes)
+      .use(eventRoutes)
       .use(feedbackRoutes)
       .use(topicRoutes)
       .use(analyticsRoutes),
