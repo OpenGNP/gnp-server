@@ -615,6 +615,11 @@ export const formService = {
     }
 
     const { allowedEmails, fields, ...rest } = input;
+    // "Open for answer" is the one switch now: turning it on also lifts an old 'closed'
+    // status (whose link 404s), which nothing in the UI can reopen any more.
+    if (rest.acceptingResponses === true && existing.status === "closed" && rest.status === undefined) {
+      rest.status = "active";
+    }
 
     return db.transaction(async (tx) => {
       let updated = existing;

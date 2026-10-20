@@ -190,8 +190,9 @@ async function insertGettingStartedForm(owner: Owner) {
         organizationId: owner.organizationId,
         formTitle: GETTING_STARTED_TITLE,
         formDescription: DESCRIPTION,
-        // Published once, not collecting now: what a form with responses usually is.
-        status: "closed",
+        // Published, not collecting now: the link works and says so. "Open for answer"
+        // turns it on.
+        status: "active",
         acceptingResponses: false,
         publishedAt: oldest,
         // Personal accounts have no organization to limit it to.
