@@ -3,6 +3,7 @@ import { eq, sql } from "drizzle-orm";
 import { db, organizations, users } from "../db/client";
 import { fetchTenantDisplayName } from "../lib/microsoftGraph";
 import { verifyMicrosoftIdToken } from "../lib/microsoftIdToken";
+import { createGettingStartedForm } from "./gettingStartedForm";
 import { isUniqueViolation, unauthorized } from "../utils/errors";
 import { verifyPassword } from "../utils/password";
 import type { LoginInput, MicrosoftLoginInput } from "../validators/authValidator";
@@ -120,6 +121,7 @@ export const authService = {
               ),
         })
         .returning();
+      await createGettingStartedForm(created!);
       return toSafeUser(created!);
     } catch (error) {
       // Two first-time sign-ins raced; the other one created the row.

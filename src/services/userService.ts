@@ -4,6 +4,7 @@ import { db, organizations, users } from "../db/client";
 import { conflict, isUniqueViolation, notFound } from "../utils/errors";
 import { hashPassword } from "../utils/password";
 import type { CreateUserInput } from "../validators/userValidator";
+import { createGettingStartedForm } from "./gettingStartedForm";
 
 const publicColumns = {
   id: users.id,
@@ -64,6 +65,7 @@ export const userService = {
         })
         .returning(publicColumns);
 
+      await createGettingStartedForm(user!);
       return user!;
     } catch (error) {
       if (isUniqueViolation(error)) {
