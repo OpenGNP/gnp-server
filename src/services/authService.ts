@@ -4,7 +4,8 @@ import { db, organizations, users } from "../db/client";
 import { fetchTenantDisplayName } from "../lib/microsoftGraph";
 import { verifyMicrosoftIdToken } from "../lib/microsoftIdToken";
 import { createGettingStartedForm } from "./gettingStartedForm";
-import { isUniqueViolation, unauthorized } from "../utils/errors";
+import { clearLoginFailures, lockedForMinutes, recordLoginFailure } from "../lib/loginAttempts";
+import { isUniqueViolation, tooManyRequests, unauthorized } from "../utils/errors";
 import { verifyPassword } from "../utils/password";
 import type { LoginInput, MicrosoftLoginInput } from "../validators/authValidator";
 
@@ -70,14 +71,32 @@ async function findOrCreateOrganizationForEmail(
   });
 }
 
-export const authService = {
-  async login(input: LoginInput): Promise<SafeUser> {
-    const user = await db.query.users.findFirst({ where: eq(users.email, input.email) });
+const PASSWORD_LOGIN_ROLES = new Set(["admin", "superadmin"]);
 
-    if (!user?.password || !(await verifyPassword(input.password, user.password))) {
+export const authService = {
+  /**
+   * Email + password: admins only (seeded / team accounts) — everyone else signs in with
+   * Microsoft. A non-admin gets the same "invalid" answer as a wrong password, so the
+   * route doesn't reveal which emails exist or what role they have.
+   */
+  async login(input: LoginInput): Promise<SafeUser> {
+    const minutes = lockedForMinutes(input.email);
+    if (minutes > 0) {
+      throw tooManyRequests(`Too many failed attempts. Try again in ${minutes} minute${minutes === 1 ? "" : "s"}.`);
+    }
+
+    const user = await db.query.users.findFirst({ where: eq(users.email, input.email) });
+    const allowed =
+      user?.password &&
+      PASSWORD_LOGIN_ROLES.has(user.role ?? "") &&
+      (await verifyPassword(input.password, user.password));
+
+    if (!user || !allowed) {
+      recordLoginFailure(input.email);
       throw unauthorized("Invalid email or password");
     }
 
+    clearLoginFailures(input.email);
     return toSafeUser(user);
   },
 
