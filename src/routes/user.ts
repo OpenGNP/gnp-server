@@ -1,6 +1,7 @@
 import { Elysia } from "elysia";
 
 import { userController } from "../controllers/userController";
+import { getAvatar } from "../services/avatarService";
 import { assertCurrentUser, requireAuth, requireRole } from "../middleware/authMiddleware";
 import { parseIntParam } from "../utils/params";
 import { successResponse } from "../utils/response";
@@ -29,6 +30,17 @@ const selfServiceUserRoutes = new Elysia()
       return successResponse("Users loaded successfully", data);
     },
     { detail: { tags, security, summary: "List members of my organization" } },
+  )
+  .get(
+    "/:id/avatar",
+    async ({ params }) => {
+      const { buffer, contentType } = await getAvatar(parseIntParam(params.id, "user id"));
+      // The URL carries the photo's hash (?v=), so a changed photo is a new URL: cache for good.
+      return new Response(buffer, {
+        headers: { "Content-Type": contentType, "Cache-Control": "private, max-age=31536000, immutable" },
+      });
+    },
+    { detail: { tags, security, summary: "A user's profile photo (from Microsoft); 404 if none" } },
   );
 
 const adminUserRoutes = new Elysia()

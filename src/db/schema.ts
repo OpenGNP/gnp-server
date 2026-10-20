@@ -1,4 +1,4 @@
-import { pgTable, serial, varchar, timestamp, index, foreignKey, unique, check, integer, boolean, uniqueIndex, text, uuid, vector, real, primaryKey } from "drizzle-orm/pg-core"
+import { pgTable, serial, varchar, timestamp, index, foreignKey, unique, check, integer, text, boolean, uniqueIndex, uuid, vector, real, primaryKey } from "drizzle-orm/pg-core"
 import { sql } from "drizzle-orm"
 
 
@@ -20,6 +20,7 @@ export const users = pgTable("users", {
 	organizationId: integer("organization_id"),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).default(sql`CURRENT_TIMESTAMP`),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).default(sql`CURRENT_TIMESTAMP`).notNull(),
+	avatarKey: text("avatar_key"),
 }, (table) => [
 	index("idx_users_organization_id").using("btree", table.organizationId.asc().nullsLast().op("int4_ops")),
 	foreignKey({

@@ -4,6 +4,7 @@ import { db, organizations, users } from "../db/client";
 import { conflict, isUniqueViolation, notFound } from "../utils/errors";
 import { hashPassword } from "../utils/password";
 import type { CreateUserInput } from "../validators/userValidator";
+import { avatarUrlFor } from "./avatarService";
 import { createGettingStartedForm } from "./gettingStartedForm";
 
 const publicColumns = {
@@ -34,13 +35,18 @@ async function resolveOrganizationId(organizationName?: string): Promise<number 
 
 export const userService = {
   async getById(id: number) {
-    const [user] = await db.select(publicColumns).from(users).where(eq(users.id, id)).limit(1);
+    const [user] = await db
+      .select({ ...publicColumns, avatarKey: users.avatarKey })
+      .from(users)
+      .where(eq(users.id, id))
+      .limit(1);
 
     if (!user) {
       throw notFound("User not found");
     }
 
-    return user;
+    const { avatarKey, ...rest } = user;
+    return { ...rest, avatarUrl: avatarUrlFor(user.id, avatarKey) };
   },
 
   async create(input: CreateUserInput) {

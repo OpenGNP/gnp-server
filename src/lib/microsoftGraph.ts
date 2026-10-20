@@ -31,3 +31,20 @@ export async function fetchTenantDisplayName(
     return null;
   }
 }
+
+/**
+ * The signed-in user's Microsoft profile photo (96×96 JPEG), via Graph with the same
+ * delegated `User.Read` token. `null` when they have none (Graph 404s) or on any failure.
+ */
+export async function fetchMyPhoto(accessToken: string): Promise<Buffer | null> {
+  try {
+    const response = await fetch("https://graph.microsoft.com/v1.0/me/photos/96x96/$value", {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      signal: AbortSignal.timeout(GRAPH_TIMEOUT_MS),
+    });
+    if (!response.ok) return null;
+    return Buffer.from(await response.arrayBuffer());
+  } catch {
+    return null;
+  }
+}

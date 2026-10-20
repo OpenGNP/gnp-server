@@ -2,6 +2,7 @@ import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
 
 import { db, formCollaborators, formOpens, forms, users } from "../db/client";
 import { badRequest } from "../utils/errors";
+import { avatarUrlFor } from "./avatarService";
 import { requireFormAccess } from "./formAccess";
 
 const MAX_VIEWERS = 50;
@@ -9,17 +10,24 @@ const MAX_VIEWERS = 50;
 /** Who a form is shared with (view-only), for its owner's Share dialog. */
 async function list(formId: number, adminId: number) {
   await requireFormAccess(formId, adminId, "manage");
-  return db
+  const rows = await db
     .select({
       email: formCollaborators.email,
       role: formCollaborators.role,
       fullName: users.fullName,
       createdAt: formCollaborators.createdAt,
+      userId: users.id,
+      avatarKey: users.avatarKey,
     })
     .from(formCollaborators)
     .leftJoin(users, eq(formCollaborators.userId, users.id))
     .where(eq(formCollaborators.formId, formId))
     .orderBy(formCollaborators.id);
+  // A photo only for someone who has signed in (and has one); others show initials.
+  return rows.map(({ userId, avatarKey, ...viewer }) => ({
+    ...viewer,
+    avatarUrl: userId === null ? null : avatarUrlFor(userId, avatarKey),
+  }));
 }
 
 export const collaboratorService = {
