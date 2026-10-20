@@ -235,7 +235,7 @@ export const formAllowedUsers = pgTable("form_allowed_users", {
 			columns: [table.userId],
 			foreignColumns: [users.id],
 			name: "fk_allowed_user"
-		}).onDelete("cascade"),
+		}).onDelete("set null"),
 	unique("form_allowed_users_form_id_email_key").on(table.email, table.formId),
 ]);
 
@@ -314,14 +314,14 @@ export const formCollaborators = pgTable("form_collaborators", {
 			name: "fk_collaborator_form"
 		}).onDelete("cascade"),
 	foreignKey({
-			columns: [table.userId],
-			foreignColumns: [users.id],
-			name: "fk_collaborator_user"
-		}).onDelete("cascade"),
-	foreignKey({
 			columns: [table.invitedBy],
 			foreignColumns: [users.id],
 			name: "fk_collaborator_inviter"
+		}).onDelete("set null"),
+	foreignKey({
+			columns: [table.userId],
+			foreignColumns: [users.id],
+			name: "fk_collaborator_user"
 		}).onDelete("set null"),
 	check("chk_collaborator_role", sql`(role)::text = 'viewer'::text`),
 ]);

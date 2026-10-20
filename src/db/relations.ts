@@ -10,11 +10,11 @@ export const usersRelations = relations(users, ({one, many}) => ({
 	folders: many(folders),
 	submissions: many(submissions),
 	formAllowedUsers: many(formAllowedUsers),
-	formCollaborators_userId: many(formCollaborators, {
-		relationName: "formCollaborators_userId_users_id"
-	}),
 	formCollaborators_invitedBy: many(formCollaborators, {
 		relationName: "formCollaborators_invitedBy_users_id"
+	}),
+	formCollaborators_userId: many(formCollaborators, {
+		relationName: "formCollaborators_userId_users_id"
 	}),
 	formOpens: many(formOpens),
 }));
@@ -149,15 +149,15 @@ export const formCollaboratorsRelations = relations(formCollaborators, ({one}) =
 		fields: [formCollaborators.formId],
 		references: [forms.id]
 	}),
-	user_userId: one(users, {
-		fields: [formCollaborators.userId],
-		references: [users.id],
-		relationName: "formCollaborators_userId_users_id"
-	}),
 	user_invitedBy: one(users, {
 		fields: [formCollaborators.invitedBy],
 		references: [users.id],
 		relationName: "formCollaborators_invitedBy_users_id"
+	}),
+	user_userId: one(users, {
+		fields: [formCollaborators.userId],
+		references: [users.id],
+		relationName: "formCollaborators_userId_users_id"
 	}),
 }));
 
