@@ -120,7 +120,14 @@ export type WhatChangedRow = {
   quote: string | null;
 };
 
-export type WhatChanged = { currentLabel: string; previousLabel: string; rows: WhatChangedRow[] };
+export type WhatChanged = {
+  currentLabel: string;
+  previousLabel: string;
+  /** The current period as [currentFrom, currentTo) ISO — View feedback narrows to it. */
+  currentFrom: string;
+  currentTo: string;
+  rows: WhatChangedRow[];
+};
 
 export type TrendBucket = "day" | "week" | "month" | "year";
 
@@ -1204,7 +1211,13 @@ export const analyticsService = {
         ? compareTopicPeriods(clean, [curStart, cal.next(curStart, unit)], [prevStart, curStart], nameOf)
         : null;
     const whatChanged: WhatChanged | null = changedRows
-      ? { currentLabel: periodLabel(curStart), previousLabel: periodLabel(prevStart), rows: changedRows }
+      ? {
+          currentLabel: periodLabel(curStart),
+          previousLabel: periodLabel(prevStart),
+          currentFrom: new Date(curStart).toISOString(),
+          currentTo: new Date(cal.next(curStart, unit)).toISOString(),
+          rows: changedRows,
+        }
       : null;
 
     // --- topic picker: rank every in-window topic ---------------------------
