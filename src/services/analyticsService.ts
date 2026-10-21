@@ -100,29 +100,27 @@ const UNCATEGORISED_ID = "uncategorised";
 const POINTS_MIN = 6;
 const POINTS_MAX = 12;
 
-export type TopicMovementStatus = "existing" | "new" | "inactive";
-
-/** One Rising / Declining row — mention COUNTS over two rolling windows ending at
- *  `to` (see MOVE_SPAN): current = the last N days, previous = the N days before. */
-export type TopicMovement = {
+/** One "What changed" row: the latest complete period vs the one before it. */
+export type WhatChangedRow = {
   id: string;
   label: string;
-  /** Mentions in the current window. */
-  currentMentions: number;
-  /** Mentions in the previous window. */
-  previousMentions: number;
-  /** currentMentions − previousMentions. Ranks the tables; |delta| ≥ MIN_DELTA to appear. */
-  delta: number;
-  status: TopicMovementStatus;
-  /** Positive / negative mentions: current window count − previous window count. */
-  positiveDelta: number;
-  negativeDelta: number;
-  /** The raw counts behind those deltas (for the row's hover detail). */
-  currentPositive: number;
-  previousPositive: number;
-  currentNegative: number;
-  previousNegative: number;
+  /** null = no clear change; only listed for its violations. */
+  kind: "worse" | "better" | "new" | null;
+  /** Share of mentions now ÷ before, when it at least doubled beyond chance; else null. */
+  growth: number | null;
+  /** The topic's share of all mentions in each period (%). */
+  share: { previous: number; current: number };
+  /** Share of the topic's own mentions that were negative (%). */
+  complaints: { previous: number; current: number };
+  /** The counts behind `complaints`: negative of total mentions, per period. */
+  complaintCounts: { previous: { negative: number; total: number }; current: { negative: number; total: number } };
+  /** Possible violations in the current period. */
+  violations: number;
+  /** One current-period point (a violation, else a complaint) — Worse / New / flagged rows. */
+  quote: string | null;
 };
+
+export type WhatChanged = { currentLabel: string; previousLabel: string; rows: WhatChangedRow[] };
 
 export type TrendBucket = "day" | "week" | "month" | "year";
 
@@ -165,7 +163,6 @@ export type FormTrend = {
   from: string;
   to: string;
   rangeLabel: string;
-  comparisonLabel: string;
   /** Analysed mentions for this form across ALL time — lets the UI tell "no data yet" from "range too narrow". */
   totalMentions: number;
   /** The lines currently on the chart. */
@@ -181,11 +178,8 @@ export type FormTrend = {
   /** Per charted topic: mentions + sentiment over the whole window (side panel default). */
   topicSummaries: TrendTopicSummary[];
   sentimentSeries: TrendSentimentPoint[];
-  risingTopics: TopicMovement[];
-  decliningTopics: TopicMovement[];
-  /** How a topic qualifies for Rising/Declining — explained by the cards' info tooltip. */
-  movementRule: { minDelta: number; limit: number };
-  emergingIssues: { id: string; title: string; description: string; riskLabel: string }[];
+  /** null = the range doesn't hold two complete periods with feedback. */
+  whatChanged: WhatChanged | null;
   timelineEvents: {
     id: string;
     date: string;
@@ -246,25 +240,23 @@ const TREND_SERIES_MAX = 8;
 /** Rows sent to the picker — beyond this, topics have negligible volume anyway. */
 const TREND_AVAILABLE_LIMIT = 500;
 
-/** Rising / Declining + Emerging Issues window length per bucket unit (N days). */
-const MOVE_SPAN: Record<TrendBucket, number> = {
-  day: DAY_MS,
-  week: 7 * DAY_MS,
-  month: 30 * DAY_MS,
-  year: 365 * DAY_MS,
-};
-const MOVE_WORDING: Record<TrendBucket, { last: string; before: string }> = {
-  day: { last: "in the last day", before: "the day before" },
-  week: { last: "in the last 7 days", before: "the week before" },
-  month: { last: "in the last 30 days", before: "the 30 days before" },
-  year: { last: "in the last 365 days", before: "the year before" },
-};
-/** Rising needs delta ≥ this; declining delta ≤ −this. */
-const MIN_DELTA = 2;
-/** Rows shown in each of Rising / Declining. */
-const MOVEMENT_LIMIT = 5;
-/** Emerging issue (no violation): at least this many negatives in the current window. */
-const EMERGING_MIN_NEGATIVE = 3;
+/** What changed: Worse / Better = the topic's complaint share moved ≥ 10 pts… */
+const CHANGE_MIN_SHIFT = 0.1;
+/** …beyond chance: a two-proportion z ≥ this (≈ 90% one-sided)… */
+const CHANGE_MIN_Z = 1.28;
+/** …with this many mentions in the period it's judged on (violations are always listed). */
+const CHANGE_MIN_MENTIONS = 3;
+/** The "N× mentions" tag, and Worse / Better on complaint counts: share of all mentions ≥ this × the previous. */
+const GROWTH_MIN_RATIO = 2;
+
+/** Two-proportion z score of x1/n1 vs x0/n0 (pooled); 0 when it can't be computed. */
+function zScore(x0: number, n0: number, x1: number, n1: number): number {
+  if (n0 === 0 || n1 === 0) return 0;
+  const p = (x0 + x1) / (n0 + n1);
+  const se = Math.sqrt(p * (1 - p) * (1 / n0 + 1 / n1));
+  return se > 0 ? (x1 / n1 - x0 / n0) / se : 0;
+}
+const CHANGE_LIMIT = 50;
 /** Timeline spike: a bucket count ≥ SPIKE_MIN_COUNT and ≥ SPIKE_MIN_ABOVE over the topic's earlier-bucket average. */
 const SPIKE_MIN_COUNT = 3;
 const SPIKE_MIN_ABOVE = 2;
@@ -286,6 +278,107 @@ const VOLUME_STEPS: readonly { bucket: TrendBucket; every: number }[] = [
   { bucket: "year", every: 10 },
   { bucket: "year", every: 25 },
 ];
+
+export type ChangeRow = { topicId: number; sentiment: Sentiment; violation: boolean; t: number; text: string };
+
+/**
+ * What changed between two periods ([start, end) ms), judged on each topic's own
+ * complaint share (negative / its mentions) — a ratio, so fewer responses overall
+ * doesn't make every topic "better" — and only when the move is beyond chance, so
+ * 1/3 → 2/3 isn't "worse". New = no mentions in `prev`. Violation rows
+ * first, then biggest shift.
+ * null when either period has no mentions.
+ */
+export function compareTopicPeriods(
+  rows: ChangeRow[],
+  cur: [number, number],
+  prev: [number, number],
+  nameOf: (id: number) => string,
+): WhatChangedRow[] | null {
+  type Tally = { total: number; neg: number; violations: number; quote: string | null; quoteRank: number };
+  const tally = ([start, end]: [number, number]) => {
+    const map = new Map<number, Tally>();
+    let all = 0;
+    for (const r of rows) {
+      if (r.t < start || r.t >= end) continue;
+      all += 1;
+      const t = map.get(r.topicId) ?? { total: 0, neg: 0, violations: 0, quote: null, quoteRank: -1 };
+      t.total += 1;
+      if (r.sentiment === "negative") t.neg += 1;
+      if (r.violation) t.violations += 1;
+      const rank = r.violation ? 2 : r.sentiment === "negative" ? 1 : 0;
+      if (rank > t.quoteRank && r.text.trim()) {
+        t.quote = r.text.trim();
+        t.quoteRank = rank;
+      }
+      map.set(r.topicId, t);
+    }
+    return { map, all };
+  };
+  const c = tally(cur);
+  const p = tally(prev);
+  if (c.all === 0 || p.all === 0) return null;
+
+  const zero: Tally = { total: 0, neg: 0, violations: 0, quote: null, quoteRank: -1 };
+  const pct = (n: number, d: number) => (d > 0 ? Math.round((n / d) * 100) : 0);
+
+  const out: (WhatChangedRow & { shift: number })[] = [];
+  for (const id of new Set([...c.map.keys(), ...p.map.keys()])) {
+    const a = c.map.get(id) ?? zero;
+    const b = p.map.get(id) ?? zero;
+    if (a.violations === 0 && Math.max(a.total, b.total) < CHANGE_MIN_MENTIONS) continue;
+    const ratio = (t: Tally) => (t.total > 0 ? t.neg / t.total : 0);
+    const shift = ratio(a) - ratio(b);
+    const clear = Math.abs(zScore(b.neg, b.total, a.neg, a.total)) >= CHANGE_MIN_Z;
+    const shareGrowth = b.total > 0 ? a.total / c.all / (b.total / p.all) : 0;
+    const growth =
+      a.total >= CHANGE_MIN_MENTIONS &&
+      shareGrowth >= GROWTH_MIN_RATIO &&
+      zScore(b.total, p.all, a.total, c.all) >= CHANGE_MIN_Z
+        ? Math.round(shareGrowth * 10) / 10
+        : null;
+    // Second signal: complaints as a share of ALL mentions — more people complaining,
+    // even when the topic's own complaint ratio holds steady.
+    const countZ = zScore(b.neg, p.all, a.neg, c.all);
+    const countUp =
+      a.neg >= CHANGE_MIN_MENTIONS && countZ >= CHANGE_MIN_Z && a.neg / c.all >= (GROWTH_MIN_RATIO * b.neg) / p.all;
+    const countDown =
+      b.neg >= CHANGE_MIN_MENTIONS && countZ <= -CHANGE_MIN_Z && b.neg / p.all >= (GROWTH_MIN_RATIO * a.neg) / c.all;
+    const ratioUp = shift >= CHANGE_MIN_SHIFT && clear && a.total >= CHANGE_MIN_MENTIONS;
+    const ratioDown = shift <= -CHANGE_MIN_SHIFT && clear && b.total >= CHANGE_MIN_MENTIONS;
+    // Either signal up wins: more unhappy people is worse even if the ratio fell.
+    const kind: WhatChangedRow["kind"] =
+      b.total === 0
+        ? "new"
+        : a.total === 0
+          ? b.neg >= CHANGE_MIN_MENTIONS ? "better" : null // complaints gone with the topic
+          : ratioUp || countUp
+            ? "worse"
+            : ratioDown || countDown
+              ? "better"
+              : null;
+    if (kind === null && a.violations === 0) continue;
+    out.push({
+      id: String(id),
+      label: nameOf(id),
+      kind,
+      growth,
+      share: { previous: pct(b.total, p.all), current: pct(a.total, c.all) },
+      complaints: { previous: pct(b.neg, b.total), current: pct(a.neg, a.total) },
+      complaintCounts: {
+        previous: { negative: b.neg, total: b.total },
+        current: { negative: a.neg, total: a.total },
+      },
+      violations: a.violations,
+      quote: kind === "better" && a.violations === 0 ? null : a.quote,
+      shift,
+    });
+  }
+  return out
+    .sort((x, y) => y.violations - x.violations || Math.abs(y.shift) - Math.abs(x.shift))
+    .slice(0, CHANGE_LIMIT)
+    .map(({ shift: _, ...row }) => row);
+}
 
 /**
  * Chart buckets for a window: the finest step that yields between `min` and `max`
@@ -942,9 +1035,9 @@ export const analyticsService = {
    * Trend tab for one form, over a caller-chosen time range + bucket granularity
    * (day / week / month / year). Buckets the form's analysed feedback into a real
    * time series — `volumeSeries` (per charted topic) and `sentimentSeries` (% per
-   * bucket). Rising / Declining and Emerging Issues compare mention counts in two
-   * rolling windows ending at `to`: the last N days vs the N days before (N from
-   * MOVE_SPAN). The Timeline lists topic spikes within the chart buckets.
+   * bucket). What changed compares the latest complete period (the bucket unit, no
+   * finer than a week) with the one before. The Timeline lists topic spikes within
+   * the chart buckets.
    *
    * Which topics get a line: `topics` (explicit ids from the picker, cap 8) wins;
    * otherwise the top 5 by `rank` (mentioned / violation) that clear a small volume
@@ -989,18 +1082,21 @@ export const analyticsService = {
     const to = Number.isFinite(opts.to) ? window.to : cal.next(cal.start(window.to, "day"), "day") - 1;
     // No explicit bucket = "auto": pick a step that gives the charts 6–12 x-axis points
     // (it can span several units, e.g. 2 weeks). `bkt` is then that step's unit, which
-    // the rising/declining comparison below keeps using.
+    // What changed below also keys off.
     const autoVolume = opts.bucket ? null : volumeBuckets(cal, from, to, POINTS_MIN, POINTS_MAX);
     const bkt: TrendBucket = opts.bucket ?? autoVolume!.bucket;
     const rank: TrendRank = opts.rank ?? "mentioned";
-    // Rising / Declining + Emerging Issues: current = (to − N, to], previous = the N
-    // before that. The row fetch below is widened to cover the previous window.
-    const moveSpan = MOVE_SPAN[bkt];
-    const wording = MOVE_WORDING[bkt];
-    const prevFrom = Math.min(from - span, to - 2 * moveSpan);
+    // What changed: the latest complete period ending by `to` (or now) vs the one before.
+    // Skipped when that period starts before the range's first chart bucket.
+    const unit: TrendBucket = bkt === "day" ? "week" : bkt;
+    const lastMs = Math.min(to, Date.now());
+    let curStart = cal.start(lastMs, unit);
+    if (cal.next(curStart, unit) > lastMs + 1) curStart = cal.prev(curStart, unit);
+    const prevStart = cal.prev(curStart, unit);
+    const periodLabel = (k: number) => (unit === "week" ? `Week of ${cal.label(k, unit)}` : cal.label(k, unit));
+    const prevFrom = Math.min(from - span, prevStart);
 
     const rangeLabel = `${cal.date(from)} – ${cal.date(to)}`;
-    const comparisonLabel = `${wording.last.replace(/^in the /, "")} vs ${wording.before}`;
     const fromIso = new Date(from).toISOString();
     const toIso = new Date(to).toISOString();
 
@@ -1010,7 +1106,6 @@ export const analyticsService = {
       from: fromIso,
       to: toIso,
       rangeLabel,
-      comparisonLabel,
       totalMentions,
       topicVolumeSeries: [],
       availableTopics: [],
@@ -1018,10 +1113,7 @@ export const analyticsService = {
       topicSentimentSeries: {},
       topicSummaries: [],
       sentimentSeries: [],
-      risingTopics: [],
-      decliningTopics: [],
-      movementRule: { minDelta: MIN_DELTA, limit: MOVEMENT_LIMIT },
-      emergingIssues: [],
+      whatChanged: null,
       timelineEvents: [],
     };
 
@@ -1031,6 +1123,7 @@ export const analyticsService = {
         topicId: points.canonicalTopicId,
         sentiment: points.sentimentLabel,
         violation: points.isViolation,
+        text: points.pointText,
         submittedAt: submissions.createdAt,
         submissionId: submissions.id,
       })
@@ -1047,24 +1140,30 @@ export const analyticsService = {
         ),
       );
 
-    // Demographic filter applies to everything below: series, picker, rising/declining.
+    // Demographic filter applies to everything below: series, picker, What changed.
     const { matchesDemo, isFiltering } = opts.demo
       ? await loadDemographics(formId, opts.demo)
       : { matchesDemo: () => true, isFiltering: false };
 
-    type CleanRow = { topicId: number; sentiment: Sentiment; violation: boolean; t: number };
+    type CleanRow = ChangeRow;
     const clean: CleanRow[] = [];
     for (const row of rows) {
       if (isFiltering && !matchesDemo(row.submissionId)) continue;
       const t = parseTs(row.submittedAt as string);
       if (Number.isNaN(t) || row.topicId === null || !isSentiment(row.sentiment)) continue;
-      clean.push({ topicId: row.topicId, sentiment: row.sentiment, violation: Boolean(row.violation), t });
+      clean.push({
+        topicId: row.topicId,
+        sentiment: row.sentiment,
+        violation: Boolean(row.violation),
+        t,
+        text: row.text,
+      });
     }
     if (clean.length === 0) return empty;
 
     const current = clean.filter((r) => r.t >= from);
     // Bounded explicitly (not just "< from") since the row fetch below is widened
-    // to also cover the movement comparison windows, which can reach further back
+    // to also cover What changed's previous period, which can reach further back
     // than one selected-range span.
     const previous = clean.filter((r) => r.t >= from - span && r.t < from);
     // Every topic seen in *either* window — a topic can decline to zero in `current`
@@ -1097,39 +1196,13 @@ export const analyticsService = {
     const prev = tallyBy(previous);
     const zero: Tally = { total: 0, neg: 0, pos: 0, violations: 0 };
 
-    // --- Rising / Declining: counts in the two rolling windows ---------------
-    const moveCur = tallyBy(clean.filter((r) => r.t > to - moveSpan && r.t <= to));
-    const movePrev = tallyBy(clean.filter((r) => r.t > to - 2 * moveSpan && r.t <= to - moveSpan));
-    const seenBefore = new Set(clean.filter((r) => r.t <= to - moveSpan).map((r) => r.topicId));
-
-    const movements: TopicMovement[] = topicIds.map((id) => {
-      const c = moveCur.get(id) ?? zero;
-      const p = movePrev.get(id) ?? zero;
-      const status: TopicMovementStatus = seenBefore.has(id) ? "existing" : c.total > 0 ? "new" : "inactive";
-      return {
-        id: String(id),
-        label: nameOf(id),
-        currentMentions: c.total,
-        previousMentions: p.total,
-        delta: c.total - p.total,
-        status,
-        positiveDelta: c.pos - p.pos,
-        negativeDelta: c.neg - p.neg,
-        currentPositive: c.pos,
-        previousPositive: p.pos,
-        currentNegative: c.neg,
-        previousNegative: p.neg,
-      };
-    });
-
-    const risingTopics = movements
-      .filter((m) => m.delta >= MIN_DELTA)
-      .sort((a, b) => b.delta - a.delta)
-      .slice(0, MOVEMENT_LIMIT);
-    const decliningTopics = movements
-      .filter((m) => m.delta <= -MIN_DELTA)
-      .sort((a, b) => a.delta - b.delta)
-      .slice(0, MOVEMENT_LIMIT);
+    const changedRows =
+      curStart >= cal.start(from, bkt)
+        ? compareTopicPeriods(clean, [curStart, cal.next(curStart, unit)], [prevStart, curStart], nameOf)
+        : null;
+    const whatChanged: WhatChanged | null = changedRows
+      ? { currentLabel: periodLabel(curStart), previousLabel: periodLabel(prevStart), rows: changedRows }
+      : null;
 
     // --- topic picker: rank every in-window topic ---------------------------
     const rankScore = (id: number): number => {
@@ -1168,27 +1241,6 @@ export const analyticsService = {
 
     const topicVolumeSeries = selectedIds.map((id) => ({ id: String(id), label: nameOf(id) }));
     const seriesIds = new Set(selectedIds);
-
-    // Emerging issues: a violation in the current window, or negatives ≥ 3 that are
-    // at least double the previous window's and up by at least 2.
-    const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
-    const emergingIssues = topicIds
-      .map((id) => ({ id, cur: moveCur.get(id) ?? zero, prev: movePrev.get(id) ?? zero }))
-      .filter(
-        ({ cur: c, prev: p }) =>
-          c.violations > 0 || (c.neg >= EMERGING_MIN_NEGATIVE && c.neg >= Math.max(2 * p.neg, p.neg + 2)),
-      )
-      .sort((a, b) => b.cur.violations - a.cur.violations || b.cur.neg - b.prev.neg - (a.cur.neg - a.prev.neg))
-      .slice(0, 3)
-      .map(({ id, cur: c, prev: p }) => ({
-        id: String(id),
-        title: nameOf(id),
-        description:
-          c.violations > 0
-            ? `${plural(c.violations, "violation")} ${wording.last}`
-            : `${plural(c.neg, "negative mention")} ${wording.last} (${p.neg} ${wording.before})`,
-        riskLabel: c.violations > 0 ? "Critical" : "High",
-      }));
 
     // --- real time series over the selected window --------------------------
     const bucketKeys: number[] = [];
@@ -1290,7 +1342,6 @@ export const analyticsService = {
       from: fromIso,
       to: toIso,
       rangeLabel,
-      comparisonLabel,
       totalMentions,
       topicVolumeSeries,
       availableTopics,
@@ -1298,10 +1349,7 @@ export const analyticsService = {
       topicSentimentSeries,
       topicSummaries,
       sentimentSeries,
-      risingTopics,
-      decliningTopics,
-      movementRule: { minDelta: MIN_DELTA, limit: MOVEMENT_LIMIT },
-      emergingIssues,
+      whatChanged,
       timelineEvents,
     };
   },
