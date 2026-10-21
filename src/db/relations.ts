@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm/relations";
-import { organizations, users, forms, formFields, folders, fieldOptions, submissions, answers, canonicalTopics, formAllowedUsers, points, aiModelRuns, formCollaborators, formOpens } from "./schema";
+import { organizations, users, forms, formFields, folders, fieldOptions, submissions, answers, canonicalTopics, formAllowedUsers, aiModelRuns, formCollaborators, points, formOpens } from "./schema";
 
 export const usersRelations = relations(users, ({one, many}) => ({
 	organization: one(organizations, {
@@ -16,6 +16,7 @@ export const usersRelations = relations(users, ({one, many}) => ({
 	formCollaborators_userId: many(formCollaborators, {
 		relationName: "formCollaborators_userId_users_id"
 	}),
+	points: many(points),
 	formOpens: many(formOpens),
 }));
 
@@ -126,17 +127,6 @@ export const formAllowedUsersRelations = relations(formAllowedUsers, ({one}) => 
 	}),
 }));
 
-export const pointsRelations = relations(points, ({one}) => ({
-	answer: one(answers, {
-		fields: [points.answerId],
-		references: [answers.id]
-	}),
-	canonicalTopic: one(canonicalTopics, {
-		fields: [points.canonicalTopicId],
-		references: [canonicalTopics.id]
-	}),
-}));
-
 export const aiModelRunsRelations = relations(aiModelRuns, ({one}) => ({
 	form: one(forms, {
 		fields: [aiModelRuns.formId],
@@ -158,6 +148,21 @@ export const formCollaboratorsRelations = relations(formCollaborators, ({one}) =
 		fields: [formCollaborators.userId],
 		references: [users.id],
 		relationName: "formCollaborators_userId_users_id"
+	}),
+}));
+
+export const pointsRelations = relations(points, ({one}) => ({
+	answer: one(answers, {
+		fields: [points.answerId],
+		references: [answers.id]
+	}),
+	canonicalTopic: one(canonicalTopics, {
+		fields: [points.canonicalTopicId],
+		references: [canonicalTopics.id]
+	}),
+	user: one(users, {
+		fields: [points.violationReviewedBy],
+		references: [users.id]
 	}),
 }));
 

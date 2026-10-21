@@ -240,38 +240,6 @@ export const formAllowedUsers = pgTable("form_allowed_users", {
 	unique("form_allowed_users_form_id_email_key").on(table.email, table.formId),
 ]);
 
-export const points = pgTable("points", {
-	id: serial().primaryKey().notNull(),
-	answerId: integer("answer_id").notNull(),
-	canonicalTopicId: integer("canonical_topic_id"),
-	pointText: text("point_text").notNull(),
-	embedding: vector({ dimensions: 384 }),
-	sentimentLabel: varchar("sentiment_label", { length: 20 }),
-	isViolation: boolean("is_violation"),
-	assignmentConfidence: real("assignment_confidence"),
-	processingStatus: varchar("processing_status", { length: 20 }).default('pending').notNull(),
-	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).default(sql`CURRENT_TIMESTAMP`),
-	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).default(sql`CURRENT_TIMESTAMP`).notNull(),
-}, (table) => [
-	index("idx_points_answer_id").using("btree", table.answerId.asc().nullsLast().op("int4_ops")),
-	index("idx_points_pending").using("btree", table.id.asc().nullsLast().op("int4_ops")).where(sql`((processing_status)::text = 'pending'::text)`),
-	index("idx_points_topic").using("btree", table.canonicalTopicId.asc().nullsLast().op("int4_ops")).where(sql`(canonical_topic_id IS NOT NULL)`),
-	foreignKey({
-			columns: [table.answerId],
-			foreignColumns: [answers.id],
-			name: "fk_point_answer"
-		}).onDelete("cascade"),
-	foreignKey({
-			columns: [table.canonicalTopicId],
-			foreignColumns: [canonicalTopics.id],
-			name: "fk_point_topic"
-		}).onDelete("set null"),
-	check("chk_sentiment", sql`(sentiment_label)::text = ANY ((ARRAY['positive'::character varying, 'neutral'::character varying, 'negative'::character varying])::text[])`),
-	check("chk_processing", sql`(processing_status)::text = ANY (ARRAY[('pending'::character varying)::text, ('assigned'::character varying)::text, ('unknown'::character varying)::text, ('clustered'::character varying)::text])`),
-	check("chk_status_topic", sql`((processing_status)::text = 'assigned'::text) = (canonical_topic_id IS NOT NULL)`),
-	check("chk_labels_together", sql`(sentiment_label IS NULL) = (is_violation IS NULL)`),
-]);
-
 export const aiModelRuns = pgTable("ai_model_runs", {
 	id: serial().primaryKey().notNull(),
 	formId: integer("form_id").notNull(),
@@ -325,6 +293,49 @@ export const formCollaborators = pgTable("form_collaborators", {
 			name: "fk_collaborator_user"
 		}).onDelete("set null"),
 	check("chk_collaborator_role", sql`(role)::text = 'viewer'::text`),
+]);
+
+export const points = pgTable("points", {
+	id: serial().primaryKey().notNull(),
+	answerId: integer("answer_id").notNull(),
+	canonicalTopicId: integer("canonical_topic_id"),
+	pointText: text("point_text").notNull(),
+	embedding: vector({ dimensions: 384 }),
+	sentimentLabel: varchar("sentiment_label", { length: 20 }),
+	isViolation: boolean("is_violation"),
+	assignmentConfidence: real("assignment_confidence"),
+	processingStatus: varchar("processing_status", { length: 20 }).default('pending').notNull(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).default(sql`CURRENT_TIMESTAMP`),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).default(sql`CURRENT_TIMESTAMP`).notNull(),
+	violationStatus: varchar("violation_status", { length: 20 }),
+	violationReviewedBy: integer("violation_reviewed_by"),
+	violationReviewedAt: timestamp("violation_reviewed_at", { withTimezone: true, mode: 'string' }),
+	violationType: varchar("violation_type", { length: 20 }),
+}, (table) => [
+	index("idx_points_answer_id").using("btree", table.answerId.asc().nullsLast().op("int4_ops")),
+	index("idx_points_pending").using("btree", table.id.asc().nullsLast().op("int4_ops")).where(sql`((processing_status)::text = 'pending'::text)`),
+	index("idx_points_topic").using("btree", table.canonicalTopicId.asc().nullsLast().op("int4_ops")).where(sql`(canonical_topic_id IS NOT NULL)`),
+	foreignKey({
+			columns: [table.answerId],
+			foreignColumns: [answers.id],
+			name: "fk_point_answer"
+		}).onDelete("cascade"),
+	foreignKey({
+			columns: [table.canonicalTopicId],
+			foreignColumns: [canonicalTopics.id],
+			name: "fk_point_topic"
+		}).onDelete("set null"),
+	foreignKey({
+			columns: [table.violationReviewedBy],
+			foreignColumns: [users.id],
+			name: "points_violation_reviewed_by_fkey"
+		}).onDelete("set null"),
+	check("chk_sentiment", sql`(sentiment_label)::text = ANY ((ARRAY['positive'::character varying, 'neutral'::character varying, 'negative'::character varying])::text[])`),
+	check("chk_processing", sql`(processing_status)::text = ANY (ARRAY[('pending'::character varying)::text, ('assigned'::character varying)::text, ('unknown'::character varying)::text, ('clustered'::character varying)::text])`),
+	check("chk_status_topic", sql`((processing_status)::text = 'assigned'::text) = (canonical_topic_id IS NOT NULL)`),
+	check("chk_labels_together", sql`(sentiment_label IS NULL) = (is_violation IS NULL)`),
+	check("chk_violation_status", sql`(violation_status)::text = ANY ((ARRAY['none'::character varying, 'possible'::character varying, 'violation'::character varying, 'confirmed'::character varying, 'dismissed'::character varying])::text[])`),
+	check("chk_violation_type", sql`(violation_type)::text = ANY ((ARRAY['none'::character varying, 'legal'::character varying, 'moral'::character varying, 'ethics'::character varying])::text[])`),
 ]);
 
 export const formOpens = pgTable("form_opens", {
