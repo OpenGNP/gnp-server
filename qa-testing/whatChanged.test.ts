@@ -90,7 +90,7 @@ describe("compareTopicPeriods", () => {
     ];
     const out = compareTopicPeriods(data, CUR, PREV, name)!;
     expect(out[0]).toMatchObject({ id: "1", kind: "worse" });
-    expect(out[0]!.growth).toBeGreaterThanOrEqual(2);
+    expect(out[0]!.mentionsTrend).toBe("up");
   });
 
   it("steady complaint ratio but far more people complaining is worse", () => {
@@ -104,7 +104,19 @@ describe("compareTopicPeriods", () => {
     ];
     const out = compareTopicPeriods(data, CUR, PREV, name)!;
     expect(out[0]).toMatchObject({ id: "1", kind: "worse", complaints: { previous: 50, current: 50 } });
-    expect(out[0]!.growth).toBeGreaterThanOrEqual(2);
+    expect(out[0]!.mentionsTrend).toBe("up");
+  });
+
+  it("tags fewer mentions too: worse even as fewer people mention it", () => {
+    const data = [
+      ...rows(9, 50, 20, "neutral"),
+      ...rows(9, 150, 20, "neutral"),
+      ...rows(1, 50, 6, "negative"),
+      ...rows(1, 50, 15, "neutral"),
+      ...rows(1, 150, 7, "negative"),
+      ...rows(1, 150, 1, "neutral"),
+    ];
+    expect(compareTopicPeriods(data, CUR, PREV, name)![0]).toMatchObject({ id: "1", kind: "worse", mentionsTrend: "down" });
   });
 
   it("a topic whose complaints vanished with it is better", () => {
