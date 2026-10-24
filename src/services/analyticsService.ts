@@ -187,12 +187,14 @@ export type FormTrend = {
   sentimentSeries: TrendSentimentPoint[];
   /** null = the range doesn't hold two complete periods with feedback. */
   whatChanged: WhatChanged | null;
+  /** Spikes on charted lines; `bucketIndex` indexes `volumeSeries`. */
   timelineEvents: {
     id: string;
     date: string;
-    description: string;
-    change: number;
-    metricLabel: string;
+    topicId: string;
+    bucketIndex: number;
+    count: number;
+    usual: number;
   }[];
 };
 
@@ -1328,10 +1330,10 @@ export const analyticsService = {
       return { label: cal.label(k, bkt), negative, neutral, positive: 100 - negative - neutral, counts };
     });
 
-    // Timeline: a topic's count in a bucket that is ≥ SPIKE_MIN_COUNT and at least
-    // SPIKE_MIN_ABOVE above its average over the earlier buckets. Newest first.
+    // Timeline: a charted topic's count in a bucket that is ≥ SPIKE_MIN_COUNT and at
+    // least SPIKE_MIN_ABOVE above its average over the earlier buckets. Newest first.
     const spikes: FormTrend["timelineEvents"] = [];
-    for (const id of topicIds) {
+    for (const id of seriesIds) {
       let earlier = 0;
       bucketKeys.forEach((k, i) => {
         const n = bucketTopicCounts[i]!.get(id) ?? 0;
@@ -1340,16 +1342,17 @@ export const analyticsService = {
           spikes.push({
             id: `spike-${id}-${i}`,
             date: new Date(k).toISOString(),
-            description: `${nameOf(id)} spiked to ${n} mentions`,
-            change: Math.round(n - usual),
-            metricLabel: "more mentions than usual",
+            topicId: String(id),
+            bucketIndex: i,
+            count: n,
+            usual: Math.round(usual),
           });
         }
         earlier += n;
       });
     }
     const timelineEvents = spikes
-      .sort((a, b) => b.date.localeCompare(a.date) || b.change - a.change)
+      .sort((a, b) => b.date.localeCompare(a.date) || b.count - b.usual - (a.count - a.usual))
       .slice(0, 5);
 
     return {
