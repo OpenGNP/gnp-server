@@ -187,7 +187,7 @@ export type FormTrend = {
   sentimentSeries: TrendSentimentPoint[];
   /** null = the range doesn't hold two complete periods with feedback. */
   whatChanged: WhatChanged | null;
-  /** Spikes on any topic (charted or not); `bucketIndex` indexes `volumeSeries`. */
+  /** Each topic's biggest spike, biggest first; `bucketIndex` indexes `volumeSeries`. */
   timelineEvents: {
     id: string;
     date: string;
@@ -1351,9 +1351,16 @@ export const analyticsService = {
         earlier += n;
       });
     }
-    const timelineEvents = spikes
-      .sort((a, b) => b.date.localeCompare(a.date) || b.count - b.usual - (a.count - a.usual))
-      .slice(0, 5);
+    // Each topic's biggest spike, biggest first (the client previews the top few).
+    const bestByTopic = new Map<string, FormTrend["timelineEvents"][number]>();
+    for (const spike of spikes) {
+      const best = bestByTopic.get(spike.topicId);
+      if (!best || spike.count - spike.usual > best.count - best.usual) bestByTopic.set(spike.topicId, spike);
+    }
+    // shortcut: capped at 20 so a many-topic form stays a small payload; raise if "Show all" feels short.
+    const timelineEvents = [...bestByTopic.values()]
+      .sort((a, b) => b.count - b.usual - (a.count - a.usual) || b.date.localeCompare(a.date))
+      .slice(0, 20);
 
     return {
       bucket: bkt,
