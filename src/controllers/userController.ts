@@ -7,6 +7,14 @@ export const userController = {
     return userService.getById(currentUser.id);
   },
 
+  deletionSummary(currentUser: CurrentUser) {
+    return userService.deletionSummary(currentUser.id);
+  },
+
+  deleteSelf(currentUser: CurrentUser) {
+    return userService.deleteSelf(currentUser.id);
+  },
+
   list(currentUser: CurrentUser, search?: string) {
     return userService.listByOrganization(currentUser.organizationId, search);
   },

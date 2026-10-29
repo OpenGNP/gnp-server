@@ -14,7 +14,7 @@ import { notFound } from "../utils/errors";
  * which also versions the URL so browsers can cache it for good.
  */
 
-const isAvatarKey = (key: string | null): key is string => typeof key === "string" && key.startsWith("avatars/");
+export const isAvatarKey = (key: string | null): key is string => typeof key === "string" && key.startsWith("avatars/");
 
 /** Where the client loads a user's photo from, or null (it shows initials instead). */
 export function avatarUrlFor(userId: number, key: string | null): string | null {
