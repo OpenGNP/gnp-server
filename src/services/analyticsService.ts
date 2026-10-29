@@ -106,8 +106,6 @@ export type WhatChangedRow = {
   label: string;
   /** null = no clear change; only listed for its violations. */
   kind: "worse" | "better" | "new" | null;
-  /** Share of mentions moved ×/÷ 1.5 or more ("up" / "down") beyond chance; else null. */
-  mentionsTrend: "up" | "down" | null;
   /** The topic's share of all mentions in each period (%). */
   share: { previous: number; current: number };
   /** Share of the topic's own mentions that were negative (%). */
@@ -257,8 +255,6 @@ const CHANGE_MIN_Z = 1.28;
 const CHANGE_MIN_MENTIONS = 3;
 /** Worse / Better on complaint counts: their share of all mentions ≥ this × (or ≤ 1/this) the previous. */
 const GROWTH_MIN_RATIO = 2;
-/** The mentions up/down tag (context only, doesn't change the kind): share of all mentions ×/÷ this. */
-const MENTIONS_TAG_RATIO = 1.5;
 
 /** Two-proportion z score of x1/n1 vs x0/n0 (pooled); 0 when it can't be computed. */
 function zScore(x0: number, n0: number, x1: number, n1: number): number {
@@ -341,14 +337,6 @@ export function compareTopicPeriods(
     const ratio = (t: Tally) => (t.total > 0 ? t.neg / t.total : 0);
     const shift = ratio(a) - ratio(b);
     const clear = Math.abs(zScore(b.neg, b.total, a.neg, a.total)) >= CHANGE_MIN_Z;
-    const shareRatio = a.total / c.all / (b.total / p.all); // NaN / 0 / Infinity fail both checks below
-    const mentionsZ = zScore(b.total, p.all, a.total, c.all);
-    const mentionsTrend: WhatChangedRow["mentionsTrend"] =
-      a.total >= CHANGE_MIN_MENTIONS && shareRatio >= MENTIONS_TAG_RATIO && mentionsZ >= CHANGE_MIN_Z && b.total > 0
-        ? "up"
-        : b.total >= CHANGE_MIN_MENTIONS && a.total > 0 && shareRatio <= 1 / MENTIONS_TAG_RATIO && mentionsZ <= -CHANGE_MIN_Z
-          ? "down"
-          : null;
     // Second signal: complaints as a share of ALL mentions — more people complaining,
     // even when the topic's own complaint ratio holds steady.
     const countZ = zScore(b.neg, p.all, a.neg, c.all);
@@ -374,7 +362,6 @@ export function compareTopicPeriods(
       id: String(id),
       label: nameOf(id),
       kind,
-      mentionsTrend,
       share: { previous: pct(b.total, p.all), current: pct(a.total, c.all) },
       complaints: { previous: pct(b.neg, b.total), current: pct(a.neg, a.total) },
       complaintCounts: {
