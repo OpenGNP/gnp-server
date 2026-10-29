@@ -187,7 +187,7 @@ export type FormTrend = {
   sentimentSeries: TrendSentimentPoint[];
   /** null = the range doesn't hold two complete periods with feedback. */
   whatChanged: WhatChanged | null;
-  /** Spikes on charted lines; `bucketIndex` indexes `volumeSeries`. */
+  /** Spikes on any topic (charted or not); `bucketIndex` indexes `volumeSeries`. */
   timelineEvents: {
     id: string;
     date: string;
@@ -1330,10 +1330,10 @@ export const analyticsService = {
       return { label: cal.label(k, bkt), negative, neutral, positive: 100 - negative - neutral, counts };
     });
 
-    // Timeline: a charted topic's count in a bucket that is ≥ SPIKE_MIN_COUNT and at
-    // least SPIKE_MIN_ABOVE above its average over the earlier buckets. Newest first.
+    // Timeline: a topic's count in a bucket that is ≥ SPIKE_MIN_COUNT and at least
+    // SPIKE_MIN_ABOVE above its average over the earlier buckets. Newest first.
     const spikes: FormTrend["timelineEvents"] = [];
-    for (const id of seriesIds) {
+    for (const id of topicIds) {
       let earlier = 0;
       bucketKeys.forEach((k, i) => {
         const n = bucketTopicCounts[i]!.get(id) ?? 0;
