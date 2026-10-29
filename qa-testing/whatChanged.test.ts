@@ -25,14 +25,34 @@ describe("compareTopicPeriods", () => {
     expect(out[0]!.quote).toBe("t1 negative");
   });
 
-  it("New = nothing in the previous period, even if mentioned earlier", () => {
+  it("New = never mentioned before; a topic back after a quiet period isn't new", () => {
     const data = [
       ...rows(9, 50, 5, "neutral"), // keeps the previous period non-empty
       ...rows(3, -50, 2, "neutral"), // before both periods
       ...rows(3, 150, 3, "negative"),
+      ...rows(5, 150, 3, "negative"), // truly new
+      ...rows(6, 150, 3, "negative"), // seen before the fetched rows
     ];
-    const out = compareTopicPeriods(data, CUR, PREV, name)!;
-    expect(out.find((r) => r.id === "3")).toMatchObject({ kind: "new", share: { previous: 0, current: 100 } });
+    const out = compareTopicPeriods(data, CUR, PREV, name, new Set([6]))!;
+    expect(out.find((r) => r.id === "5")).toMatchObject({ kind: "new", share: { previous: 0, current: 33 } });
+    expect(out.find((r) => r.id === "3")?.kind).toBe("worse");
+    expect(out.find((r) => r.id === "6")?.kind).toBe("worse");
+  });
+
+  it("lists a brand-new topic from its first mention", () => {
+    const data = [...rows(9, 50, 5, "neutral"), ...rows(9, 150, 5, "neutral"), ...rows(7, 150, 1, "neutral")];
+    expect(compareTopicPeriods(data, CUR, PREV, name)!.find((r) => r.id === "7")?.kind).toBe("new");
+    // Seen before: one quiet mention back isn't listed.
+    expect(compareTopicPeriods(data, CUR, PREV, name, new Set([7]))!.find((r) => r.id === "7")).toBeUndefined();
+  });
+
+  it("a topic back after a quiet period with 0 → 5 complaints is worse, even in a big form", () => {
+    const data = [
+      ...rows(9, 50, 2000, "neutral"),
+      ...rows(9, 150, 2000, "neutral"),
+      ...rows(8, 150, 5, "negative"),
+    ];
+    expect(compareTopicPeriods(data, CUR, PREV, name, new Set([8]))!.find((r) => r.id === "8")?.kind).toBe("worse");
   });
 
   it("puts violations first and keeps them even when steady", () => {
@@ -81,7 +101,7 @@ describe("compareTopicPeriods", () => {
     expect(compareTopicPeriods(large, CUR, PREV, name)![0]!.kind).toBe("worse");
   });
 
-  it("tags a listed topic that was mentioned far more", () => {
+  it("far more mentions, now complaints, is worse", () => {
     const data = [
       ...rows(9, 50, 20, "neutral"),
       ...rows(9, 150, 20, "neutral"),
@@ -90,7 +110,6 @@ describe("compareTopicPeriods", () => {
     ];
     const out = compareTopicPeriods(data, CUR, PREV, name)!;
     expect(out[0]).toMatchObject({ id: "1", kind: "worse" });
-    expect(out[0]!.mentionsTrend).toBe("up");
   });
 
   it("steady complaint ratio but far more people complaining is worse", () => {
@@ -104,10 +123,9 @@ describe("compareTopicPeriods", () => {
     ];
     const out = compareTopicPeriods(data, CUR, PREV, name)!;
     expect(out[0]).toMatchObject({ id: "1", kind: "worse", complaints: { previous: 50, current: 50 } });
-    expect(out[0]!.mentionsTrend).toBe("up");
   });
 
-  it("tags fewer mentions too: worse even as fewer people mention it", () => {
+  it("worse on its complaint ratio even as fewer people mention it", () => {
     const data = [
       ...rows(9, 50, 20, "neutral"),
       ...rows(9, 150, 20, "neutral"),
@@ -116,7 +134,7 @@ describe("compareTopicPeriods", () => {
       ...rows(1, 150, 7, "negative"),
       ...rows(1, 150, 1, "neutral"),
     ];
-    expect(compareTopicPeriods(data, CUR, PREV, name)![0]).toMatchObject({ id: "1", kind: "worse", mentionsTrend: "down" });
+    expect(compareTopicPeriods(data, CUR, PREV, name)![0]).toMatchObject({ id: "1", kind: "worse" });
   });
 
   it("a topic whose complaints vanished with it is better", () => {

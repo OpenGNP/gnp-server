@@ -1,4 +1,4 @@
-import { and, count, countDistinct, desc, eq, gte, inArray, isNotNull, isNull, lte, max, min, ne, or, sql } from "drizzle-orm";
+import { and, count, countDistinct, desc, eq, gte, inArray, isNotNull, isNull, lt, lte, max, min, ne, or, sql } from "drizzle-orm";
 
 import {
   aiModelRuns,
@@ -292,7 +292,9 @@ export type ChangeRow = { topicId: number; sentiment: Sentiment; violation: bool
  * What changed between two periods ([start, end) ms), judged on each topic's own
  * complaint share (negative / its mentions) — a ratio, so fewer responses overall
  * doesn't make every topic "better" — and only when the move is beyond chance, so
- * 1/3 → 2/3 isn't "worse". New = no mentions in `prev`. Violation rows
+ * 1/3 → 2/3 isn't "worse". New = never mentioned before `cur` (in `rows` or
+ * `seenBefore`), listed from its first mention; a topic back after a quiet period
+ * with ≥ CHANGE_MIN_MENTIONS complaints is worse. Violation rows
  * first, then biggest shift.
  * null when either period has no mentions.
  */
@@ -301,6 +303,8 @@ export function compareTopicPeriods(
   cur: [number, number],
   prev: [number, number],
   nameOf: (id: number) => string,
+  /** Topics mentioned before `rows` starts, so they aren't called new. */
+  seenBefore: ReadonlySet<number> = new Set(),
 ): WhatChangedRow[] | null {
   type Tally = { total: number; neg: number; violations: number; quote: string | null; quoteRank: number };
   const tally = ([start, end]: [number, number]) => {
@@ -325,6 +329,8 @@ export function compareTopicPeriods(
   const c = tally(cur);
   const p = tally(prev);
   if (c.all === 0 || p.all === 0) return null;
+  const seen = new Set(seenBefore);
+  for (const r of rows) if (r.t < prev[0]) seen.add(r.topicId);
 
   const zero: Tally = { total: 0, neg: 0, violations: 0, quote: null, quoteRank: -1 };
   const pct = (n: number, d: number) => (d > 0 ? Math.round((n / d) * 100) : 0);
@@ -333,7 +339,9 @@ export function compareTopicPeriods(
   for (const id of new Set([...c.map.keys(), ...p.map.keys()])) {
     const a = c.map.get(id) ?? zero;
     const b = p.map.get(id) ?? zero;
-    if (a.violations === 0 && Math.max(a.total, b.total) < CHANGE_MIN_MENTIONS) continue;
+    // A first-ever mention always shows, even just one; everything else needs enough mentions.
+    const isNew = b.total === 0 && !seen.has(id);
+    if (!isNew && a.violations === 0 && Math.max(a.total, b.total) < CHANGE_MIN_MENTIONS) continue;
     const ratio = (t: Tally) => (t.total > 0 ? t.neg / t.total : 0);
     const shift = ratio(a) - ratio(b);
     const clear = Math.abs(zScore(b.neg, b.total, a.neg, a.total)) >= CHANGE_MIN_Z;
@@ -348,11 +356,12 @@ export function compareTopicPeriods(
     const ratioDown = shift <= -CHANGE_MIN_SHIFT && clear && b.total >= CHANGE_MIN_MENTIONS;
     // Either signal up wins: more unhappy people is worse even if the ratio fell.
     const kind: WhatChangedRow["kind"] =
-      b.total === 0
+      isNew
         ? "new"
         : a.total === 0
           ? b.neg >= CHANGE_MIN_MENTIONS ? "better" : null // complaints gone with the topic
-          : ratioUp || countUp
+          : (b.total === 0 && a.neg >= CHANGE_MIN_MENTIONS) || ratioUp || countUp // back after a quiet period, with complaints
+
             ? "worse"
             : ratioDown || countDown
               ? "better"
@@ -377,6 +386,32 @@ export function compareTopicPeriods(
     .sort((x, y) => y.violations - x.violations || Math.abs(y.shift) - Math.abs(x.shift))
     .slice(0, CHANGE_LIMIT)
     .map(({ shift: _, ...row }) => row);
+}
+
+/** Of the topics in the current period but not the previous one, those mentioned before `before` (any demographic). */
+async function topicsSeenBefore(
+  formId: number,
+  before: number,
+  rows: ChangeRow[],
+  prevStart: number,
+  curStart: number,
+): Promise<Set<number>> {
+  const inPrev = new Set(rows.filter((r) => r.t >= prevStart && r.t < curStart).map((r) => r.topicId));
+  const candidates = [...new Set(rows.filter((r) => r.t >= curStart && !inPrev.has(r.topicId)).map((r) => r.topicId))];
+  if (candidates.length === 0) return new Set();
+  const found = await db
+    .selectDistinct({ id: points.canonicalTopicId })
+    .from(points)
+    .innerJoin(answers, eq(points.answerId, answers.id))
+    .innerJoin(submissions, eq(answers.submissionId, submissions.id))
+    .where(
+      and(
+        eq(submissions.formId, formId),
+        inArray(points.canonicalTopicId, candidates),
+        lt(submissions.createdAt, new Date(before).toISOString()),
+      ),
+    );
+  return new Set(found.map((f) => f.id).filter((id): id is number => id !== null));
 }
 
 /**
@@ -1197,7 +1232,13 @@ export const analyticsService = {
 
     const changedRows =
       curStart >= cal.start(from, bkt)
-        ? compareTopicPeriods(clean, [curStart, cal.next(curStart, unit)], [prevStart, curStart], nameOf)
+        ? compareTopicPeriods(
+            clean,
+            [curStart, cal.next(curStart, unit)],
+            [prevStart, curStart],
+            nameOf,
+            await topicsSeenBefore(formId, prevFrom, clean, prevStart, curStart),
+          )
         : null;
     const whatChanged: WhatChanged | null = changedRows
       ? {
