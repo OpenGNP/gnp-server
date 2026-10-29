@@ -4,6 +4,7 @@ import { userController } from "../controllers/userController";
 import { getAvatar } from "../services/avatarService";
 import { assertCurrentUser, requireAuth, requireRole } from "../middleware/authMiddleware";
 import { parseIntParam } from "../utils/params";
+import { AUTH_COOKIE_NAME } from "../utils/cookies";
 import { successResponse } from "../utils/response";
 import { createUserSchema, updateUserRoleSchema } from "../validators/userValidator";
 
@@ -20,6 +21,25 @@ const selfServiceUserRoutes = new Elysia()
       return successResponse("Current user loaded successfully", user);
     },
     { detail: { tags, security, summary: "Get the authenticated user" } },
+  )
+  .get(
+    "/me/deletion-summary",
+    async ({ currentUser }) => {
+      assertCurrentUser(currentUser);
+      const data = await userController.deletionSummary(currentUser);
+      return successResponse("Deletion summary loaded successfully", data);
+    },
+    { detail: { tags, security, summary: "What deleting my account would remove" } },
+  )
+  .delete(
+    "/me",
+    async ({ currentUser, cookie }) => {
+      assertCurrentUser(currentUser);
+      await userController.deleteSelf(currentUser);
+      cookie[AUTH_COOKIE_NAME]!.remove();
+      return successResponse("Account deleted successfully", null);
+    },
+    { detail: { tags, security, summary: "Delete my account, with my forms and their responses" } },
   )
   .get(
     "/",

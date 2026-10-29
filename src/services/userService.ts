@@ -1,10 +1,12 @@
-import { and, eq, ilike, or } from "drizzle-orm";
+import { and, count, eq, ilike, or } from "drizzle-orm";
 
-import { db, organizations, users } from "../db/client";
+import { db, forms, organizations, submissions, users } from "../db/client";
 import { conflict, isUniqueViolation, notFound } from "../utils/errors";
+import { removeObjectSafely } from "../lib/minio";
 import { hashPassword } from "../utils/password";
 import type { CreateUserInput } from "../validators/userValidator";
-import { avatarUrlFor } from "./avatarService";
+import { avatarUrlFor, isAvatarKey } from "./avatarService";
+import { isManagedCoverKey } from "./formService";
 import { createGettingStartedForm } from "./gettingStartedForm";
 
 const publicColumns = {
@@ -34,10 +36,43 @@ async function resolveOrganizationId(organizationName?: string): Promise<number 
 }
 
 export const userService = {
+  /** What deleting this account takes with it, for the confirm dialog. */
+  async deletionSummary(id: number) {
+    const [owned] = await db.select({ value: count() }).from(forms).where(eq(forms.adminId, id));
+    const [answered] = await db
+      .select({ value: count(submissions.id) })
+      .from(submissions)
+      .innerJoin(forms, eq(submissions.formId, forms.id))
+      .where(eq(forms.adminId, id));
+    return { forms: owned?.value ?? 0, responses: answered?.value ?? 0 };
+  },
+
+  /**
+   * Deletes the account. The DB cascades its forms (with their responses) and folders;
+   * responses it sent to others' forms stay, unlinked. MinIO files are removed here.
+   */
+  async deleteSelf(id: number) {
+    const [user] = await db.select({ role: users.role, avatarKey: users.avatarKey }).from(users).where(eq(users.id, id));
+    if (!user) throw notFound("User not found");
+    if (user.role === "superadmin") {
+      const [supers] = await db.select({ value: count() }).from(users).where(eq(users.role, "superadmin"));
+      if ((supers?.value ?? 0) <= 1) throw conflict("You're the only superadmin. Make someone else superadmin first.");
+    }
+
+    const covers = await db.select({ key: forms.coverImageUrl }).from(forms).where(eq(forms.adminId, id));
+    await db.delete(users).where(eq(users.id, id));
+
+    await Promise.all([
+      ...covers.map(({ key }) => (isManagedCoverKey(key) ? removeObjectSafely(key) : null)),
+      isAvatarKey(user.avatarKey) ? removeObjectSafely(user.avatarKey) : null,
+    ]);
+  },
+
   async getById(id: number) {
     const [user] = await db
-      .select({ ...publicColumns, avatarKey: users.avatarKey })
+      .select({ ...publicColumns, avatarKey: users.avatarKey, organizationName: organizations.organizationName })
       .from(users)
+      .leftJoin(organizations, eq(users.organizationId, organizations.id))
       .where(eq(users.id, id))
       .limit(1);
 
