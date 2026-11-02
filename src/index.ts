@@ -10,6 +10,7 @@ import { feedbackRoutes } from "./routes/feedback";
 import { topicRoutes } from "./routes/topic";
 import { analyticsRoutes } from "./routes/analytics";
 import { eventRoutes } from "./routes/events";
+import { demoRoutes } from "./routes/demo";
 
 import { databaseConfig } from "./config/database";
 import { checkDatabase } from "./db/client";
@@ -53,7 +54,8 @@ const app = new Elysia()
       .use(eventRoutes)
       .use(feedbackRoutes)
       .use(topicRoutes)
-      .use(analyticsRoutes),
+      .use(analyticsRoutes)
+      .use(demoRoutes),
   )
   .listen(env.PORT);
 
