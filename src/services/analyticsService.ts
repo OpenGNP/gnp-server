@@ -53,9 +53,8 @@ type Sentiment = "negative" | "neutral" | "positive";
 // Second users join: the reviewer, beside the respondent.
 const reviewers = alias(users, "reviewers");
 
-/** A flagged point's level for the client. Older rows (before levels existed) read as "violation". */
-const violationLevel = (status: string | null): "possible" | "violation" | "confirmed" =>
-  status === "possible" || status === "confirmed" ? status : "violation";
+/** The AI's level for a flagged point. Older rows (before levels existed) read as "violation". */
+const violationLevel = (status: string | null): "possible" | "violation" => (status === "possible" ? "possible" : "violation");
 
 export type ThemeKeyword = { text: string; weight: 1 | 2 | 3 };
 
@@ -848,6 +847,7 @@ export const analyticsService = {
         sentiment: points.sentimentLabel,
         violation: activeViolationSql,
         violationStatus: points.violationStatus,
+        reviewedStatus: points.violationReviewedStatus,
         violationType: points.violationType,
         reviewedBy: reviewers.fullName,
         reviewedAt: points.violationReviewedAt,
@@ -993,10 +993,10 @@ export const analyticsService = {
         id: String(row.id),
         sentiment: row.sentiment as Sentiment,
         violation: Boolean(row.violation),
-        violationStatus: row.violation ? violationLevel(row.violationStatus) : null,
+        violationStatus: !row.violation ? null : row.reviewedStatus === "confirmed" ? "confirmed" : violationLevel(row.violationStatus),
         violationType: row.violation ? (row.violationType ?? null) : null,
-        reviewedBy: row.violation && row.violationStatus === "confirmed" ? (row.reviewedBy ?? "Someone") : null,
-        reviewedAt: row.violation && row.violationStatus === "confirmed" ? (row.reviewedAt ?? null) : null,
+        reviewedBy: row.reviewedStatus === "confirmed" ? (row.reviewedBy ?? "Someone") : null,
+        reviewedAt: row.reviewedStatus === "confirmed" ? (row.reviewedAt ?? null) : null,
         quote: row.pointText ?? "",
         originalFeedback: row.originalFeedback ?? row.pointText ?? "",
         submissionId: row.submissionId,
