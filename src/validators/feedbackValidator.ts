@@ -18,3 +18,7 @@ export const submitFeedbackSchema = z.object({
 });
 
 export type SubmitFeedbackInput = z.infer<typeof submitFeedbackSchema>;
+
+export const reviewViolationSchema = z.object({
+  status: z.enum(["confirmed", "dismissed"]).nullable(),
+});
