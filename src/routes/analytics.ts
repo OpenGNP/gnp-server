@@ -4,6 +4,8 @@ import { analyticsController } from "../controllers/analyticsController";
 import { assertCurrentUser, requireAuth } from "../middleware/authMiddleware";
 import { parseIntParam } from "../utils/params";
 import { successResponse } from "../utils/response";
+import { reviewPointViolation } from "../services/violationReview";
+import { reviewViolationSchema } from "../validators/feedbackValidator";
 
 const tags = ["Analytics"];
 const security = [{ bearerAuth: [] }];
@@ -27,6 +29,18 @@ export const analyticsRoutes = new Elysia({ prefix: "/analytics" })
       return successResponse("Topic trends loaded successfully", data);
     },
     { detail: { tags, security, summary: "Recent topic trend periods (platform-wide)" } },
+  )
+  .patch(
+    "/points/:id/violation",
+    async ({ params, body, currentUser }) => {
+      assertCurrentUser(currentUser);
+      await reviewPointViolation(parseIntParam(params.id, "point id"), currentUser.id, body.status);
+      return successResponse("Violation review saved", null);
+    },
+    {
+      body: reviewViolationSchema,
+      detail: { tags, security, summary: "Confirm or dismiss a flagged point, or undo (null) — form owner only" },
+    },
   )
   .get(
     "/forms/:id/responses",

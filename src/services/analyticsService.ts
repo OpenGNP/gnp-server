@@ -1,3 +1,4 @@
+import { alias } from "drizzle-orm/pg-core";
 import { and, count, countDistinct, desc, eq, gte, inArray, isNotNull, isNull, lt, lte, max, min, ne, or, sql } from "drizzle-orm";
 
 import {
@@ -15,6 +16,7 @@ import {
 import { normalizeDbTimestamp, parseDbTimestamp } from "../utils/timestamp";
 import { createCalendar, resolveTimeZone, type Calendar } from "../utils/timezone";
 import { requireFormAccess } from "./formAccess";
+import { activeViolationSql } from "./violationReview";
 import { loadResponseRecords } from "./responseRecords";
 
 const SENTIMENT_LABELS = ["positive", "neutral", "negative"] as const;
@@ -48,13 +50,27 @@ const respondentNameSql = sql<string | null>`coalesce(nullif(${submissions.respo
 
 type Sentiment = "negative" | "neutral" | "positive";
 
+// Second users join: the reviewer, beside the respondent.
+const reviewers = alias(users, "reviewers");
+
+/** A flagged point's level for the client. Older rows (before levels existed) read as "violation". */
+const violationLevel = (status: string | null): "possible" | "violation" | "confirmed" =>
+  status === "possible" || status === "confirmed" ? status : "violation";
+
 export type ThemeKeyword = { text: string; weight: 1 | 2 | 3 };
 
 export type ThemeFeedbackPoint = {
   id: string;
   sentiment: Sentiment;
-  /** The AI pipeline flagged this point as a violation (points.is_violation). */
+  /** Flagged by the AI pipeline and not dismissed by a reviewer. */
   violation: boolean;
+  /** For a `violation`: how sure — the AI's possible / violation, or a reviewer's confirmed. */
+  violationStatus: "possible" | "violation" | "confirmed" | null;
+  /** The AI's category (legal / moral / ethics), when flagged. */
+  violationType: string | null;
+  /** Who confirmed it, and when (null until reviewed). */
+  reviewedBy: string | null;
+  reviewedAt: string | null;
   quote: string;
   originalFeedback: string;
   /** The response this came from — opens it in the Individual tab. */
@@ -578,7 +594,7 @@ export const analyticsService = {
       .innerJoin(answers, eq(points.answerId, answers.id))
       .innerJoin(submissions, eq(answers.submissionId, submissions.id))
       .innerJoin(forms, eq(submissions.formId, forms.id))
-      .where(and(eq(forms.adminId, adminId), eq(points.isViolation, true)));
+      .where(and(eq(forms.adminId, adminId), activeViolationSql));
 
     // Topics on this admin's forms. (canonical_topics no longer has a status column —
     // every row is a live topic.)
@@ -631,7 +647,7 @@ export const analyticsService = {
         positiveCount: sql<number>`count(*) filter (where ${points.sentimentLabel} = 'positive')`.mapWith(Number),
         neutralCount: sql<number>`count(*) filter (where ${points.sentimentLabel} = 'neutral')`.mapWith(Number),
         negativeCount: sql<number>`count(*) filter (where ${points.sentimentLabel} = 'negative')`.mapWith(Number),
-        violationCount: sql<number>`count(*) filter (where ${points.isViolation})`.mapWith(Number),
+        violationCount: sql<number>`count(*) filter (where ${activeViolationSql})`.mapWith(Number),
       })
       .from(points)
       .innerJoin(answers, eq(points.answerId, answers.id))
@@ -830,7 +846,11 @@ export const analyticsService = {
         // so the status is the only thing that tells them apart.
         status: points.processingStatus,
         sentiment: points.sentimentLabel,
-        violation: points.isViolation,
+        violation: activeViolationSql,
+        violationStatus: points.violationStatus,
+        violationType: points.violationType,
+        reviewedBy: reviewers.fullName,
+        reviewedAt: points.violationReviewedAt,
         pointText: points.pointText,
         originalFeedback: answers.answerText,
         submissionId: submissions.id,
@@ -841,6 +861,7 @@ export const analyticsService = {
       .innerJoin(answers, eq(points.answerId, answers.id))
       .innerJoin(submissions, eq(answers.submissionId, submissions.id))
       .leftJoin(users, eq(submissions.userId, users.id))
+      .leftJoin(reviewers, eq(points.violationReviewedBy, reviewers.id))
       .where(and(eq(submissions.formId, formId), inWindow))
       .orderBy(desc(submissions.createdAt));
 
@@ -972,6 +993,10 @@ export const analyticsService = {
         id: String(row.id),
         sentiment: row.sentiment as Sentiment,
         violation: Boolean(row.violation),
+        violationStatus: row.violation ? violationLevel(row.violationStatus) : null,
+        violationType: row.violation ? (row.violationType ?? null) : null,
+        reviewedBy: row.violation && row.violationStatus === "confirmed" ? (row.reviewedBy ?? "Someone") : null,
+        reviewedAt: row.violation && row.violationStatus === "confirmed" ? (row.reviewedAt ?? null) : null,
         quote: row.pointText ?? "",
         originalFeedback: row.originalFeedback ?? row.pointText ?? "",
         submissionId: row.submissionId,
@@ -1156,7 +1181,7 @@ export const analyticsService = {
       .select({
         topicId: points.canonicalTopicId,
         sentiment: points.sentimentLabel,
-        violation: points.isViolation,
+        violation: activeViolationSql,
         text: points.pointText,
         submittedAt: submissions.createdAt,
         submissionId: submissions.id,
