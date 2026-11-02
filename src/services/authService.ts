@@ -4,7 +4,6 @@ import { db, organizations, users } from "../db/client";
 import { fetchTenantDisplayName } from "../lib/microsoftGraph";
 import { verifyMicrosoftIdToken } from "../lib/microsoftIdToken";
 import { avatarUrlFor, syncMicrosoftAvatar } from "./avatarService";
-import { createGettingStartedForm } from "./gettingStartedForm";
 import { clearLoginFailures, lockedForMinutes, recordLoginFailure } from "../lib/loginAttempts";
 import { isUniqueViolation, tooManyRequests, unauthorized } from "../utils/errors";
 import { verifyPassword } from "../utils/password";
@@ -117,7 +116,6 @@ async function findOrCreateMicrosoftUser(
             ),
       })
       .returning();
-    await createGettingStartedForm(created!);
     return created!;
   } catch (error) {
     // Two first-time sign-ins raced; the other one created the row.

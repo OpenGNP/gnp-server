@@ -7,7 +7,6 @@ import { hashPassword } from "../utils/password";
 import type { CreateUserInput } from "../validators/userValidator";
 import { avatarUrlFor, isAvatarKey } from "./avatarService";
 import { isManagedCoverKey } from "./formService";
-import { createGettingStartedForm } from "./gettingStartedForm";
 
 const publicColumns = {
   id: users.id,
@@ -106,7 +105,6 @@ export const userService = {
         })
         .returning(publicColumns);
 
-      await createGettingStartedForm(user!);
       return user!;
     } catch (error) {
       if (isUniqueViolation(error)) {
