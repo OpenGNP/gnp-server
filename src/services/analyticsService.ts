@@ -465,6 +465,16 @@ function volumeBuckets(
 }
 
 const SENTIMENTS: readonly Sentiment[] = ["negative", "neutral", "positive"];
+/** One analysed point of a response, for the Individual tab's panel. */
+export type IndividualPoint = {
+  /** null: analysed but not filed under a topic yet. */
+  topicId: string | null;
+  topic: string | null;
+  sentiment: Sentiment | null;
+  violation: boolean;
+  text: string;
+};
+
 const isSentiment = (value: string | null): value is Sentiment =>
   value !== null && (SENTIMENTS as readonly string[]).includes(value);
 
@@ -784,6 +794,35 @@ export const analyticsService = {
   /** Each submission's full set of answers, newest first — the Dashboard's Individual tab. */
   async individualResponses(formId: number, adminId: number) {
     const { fields, records } = await loadResponseRecords(formId, adminId);
+    // What the AI made of each response: its analysed points, with topic and sentiment.
+    // Same violation rule as every count (a dismissed flag doesn't show).
+    const pointRows = await db
+      .select({
+        submissionId: answers.submissionId,
+        topicId: points.canonicalTopicId,
+        topic: canonicalTopics.canonicalName,
+        sentiment: points.sentimentLabel,
+        violation: activeViolationSql,
+        text: points.pointText,
+      })
+      .from(points)
+      .innerJoin(answers, eq(points.answerId, answers.id))
+      .innerJoin(submissions, eq(answers.submissionId, submissions.id))
+      .leftJoin(canonicalTopics, eq(points.canonicalTopicId, canonicalTopics.id))
+      .where(and(eq(submissions.formId, formId), ne(points.processingStatus, "pending")))
+      .orderBy(points.id);
+    const pointsBySubmission = new Map<number, IndividualPoint[]>();
+    for (const row of pointRows) {
+      const list = pointsBySubmission.get(row.submissionId) ?? [];
+      list.push({
+        topicId: row.topicId === null ? null : String(row.topicId),
+        topic: row.topicId === null ? null : (row.topic ?? "Untitled topic"),
+        sentiment: isSentiment(row.sentiment) ? row.sentiment : null,
+        violation: Boolean(row.violation),
+        text: row.text,
+      });
+      pointsBySubmission.set(row.submissionId, list);
+    }
     return {
       fields,
       responses: records
@@ -794,6 +833,7 @@ export const analyticsService = {
           submittedAt: record.submittedAt,
           respondentName: record.respondentName,
           answers: Object.fromEntries(record.answers),
+          points: pointsBySubmission.get(record.id) ?? [],
         }))
         .reverse(),
     };
