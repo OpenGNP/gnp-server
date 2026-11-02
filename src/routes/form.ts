@@ -128,7 +128,7 @@ const adminFormRoutes = new Elysia()
     async ({ params, body, currentUser }) => {
       assertCurrentUser(currentUser);
       const id = parseIntParam(params.id, "form id");
-      const data = await formController.replaceCollaborators(id, currentUser.id, body.emails);
+      const data = await formController.replaceCollaborators(id, currentUser.id, body.emails, body.showNamesToViewers);
       return successResponse("Sharing updated successfully", data);
     },
     {

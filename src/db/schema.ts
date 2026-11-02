@@ -56,52 +56,6 @@ export const formFields = pgTable("form_fields", {
 	check("chk_field_section", sql`(section)::text = ANY ((ARRAY['demographic'::character varying, 'feedback'::character varying])::text[])`),
 ]);
 
-export const forms = pgTable("forms", {
-	id: serial().primaryKey().notNull(),
-	adminId: integer("admin_id").notNull(),
-	folderId: integer("folder_id"),
-	organizationId: integer("organization_id"),
-	formTitle: varchar("form_title", { length: 255 }),
-	formDescription: text("form_description"),
-	coverImageUrl: text("cover_image_url"),
-	status: varchar({ length: 20 }).default('draft').notNull(),
-	acceptingResponses: boolean("accepting_responses").default(true).notNull(),
-	publishedAt: timestamp("published_at", { withTimezone: true, mode: 'string' }),
-	publicToken: uuid("public_token").defaultRandom().notNull(),
-	accessType: varchar("access_type", { length: 30 }).default('organization').notNull(),
-	recordName: boolean("record_name").default(false),
-	oneResponsePerPerson: boolean("one_response_per_person").default(false),
-	sortOrder: integer("sort_order").default(0).notNull(),
-	startDate: timestamp("start_date", { withTimezone: true, mode: 'string' }),
-	endDate: timestamp("end_date", { withTimezone: true, mode: 'string' }),
-	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).default(sql`CURRENT_TIMESTAMP`),
-	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).default(sql`CURRENT_TIMESTAMP`).notNull(),
-	urlId: uuid("url_id").defaultRandom().notNull(),
-}, (table) => [
-	index("idx_forms_admin_status").using("btree", table.adminId.asc().nullsLast().op("int4_ops"), table.status.asc().nullsLast().op("text_ops")),
-	index("idx_forms_folder_id").using("btree", table.folderId.asc().nullsLast().op("int4_ops")),
-	index("idx_forms_organization_id").using("btree", table.organizationId.asc().nullsLast().op("int4_ops")),
-	uniqueIndex("uq_forms_url_id").using("btree", table.urlId.asc().nullsLast().op("uuid_ops")),
-	foreignKey({
-			columns: [table.adminId],
-			foreignColumns: [users.id],
-			name: "fk_form_admin"
-		}).onDelete("cascade"),
-	foreignKey({
-			columns: [table.folderId],
-			foreignColumns: [folders.id],
-			name: "fk_form_folder"
-		}).onDelete("set null"),
-	foreignKey({
-			columns: [table.organizationId],
-			foreignColumns: [organizations.id],
-			name: "fk_form_organization"
-		}).onDelete("set null"),
-	unique("uq_form_public_token").on(table.publicToken),
-	check("chk_form_status", sql`(status)::text = ANY ((ARRAY['draft'::character varying, 'active'::character varying, 'closed'::character varying, 'archived'::character varying])::text[])`),
-	check("chk_access_type", sql`(access_type)::text = ANY ((ARRAY['public'::character varying, 'organization'::character varying, 'specific'::character varying])::text[])`),
-]);
-
 export const folders = pgTable("folders", {
 	id: serial().primaryKey().notNull(),
 	adminId: integer("admin_id").notNull(),
@@ -198,6 +152,53 @@ export const answers = pgTable("answers", {
 			foreignColumns: [fieldOptions.id],
 			name: "fk_answer_option"
 		}).onDelete("set null"),
+]);
+
+export const forms = pgTable("forms", {
+	id: serial().primaryKey().notNull(),
+	adminId: integer("admin_id").notNull(),
+	folderId: integer("folder_id"),
+	organizationId: integer("organization_id"),
+	formTitle: varchar("form_title", { length: 255 }),
+	formDescription: text("form_description"),
+	coverImageUrl: text("cover_image_url"),
+	status: varchar({ length: 20 }).default('draft').notNull(),
+	acceptingResponses: boolean("accepting_responses").default(true).notNull(),
+	publishedAt: timestamp("published_at", { withTimezone: true, mode: 'string' }),
+	publicToken: uuid("public_token").defaultRandom().notNull(),
+	accessType: varchar("access_type", { length: 30 }).default('organization').notNull(),
+	recordName: boolean("record_name").default(false),
+	oneResponsePerPerson: boolean("one_response_per_person").default(false),
+	sortOrder: integer("sort_order").default(0).notNull(),
+	startDate: timestamp("start_date", { withTimezone: true, mode: 'string' }),
+	endDate: timestamp("end_date", { withTimezone: true, mode: 'string' }),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).default(sql`CURRENT_TIMESTAMP`),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).default(sql`CURRENT_TIMESTAMP`).notNull(),
+	urlId: uuid("url_id").defaultRandom().notNull(),
+	showNamesToViewers: boolean("show_names_to_viewers").default(false).notNull(),
+}, (table) => [
+	index("idx_forms_admin_status").using("btree", table.adminId.asc().nullsLast().op("int4_ops"), table.status.asc().nullsLast().op("text_ops")),
+	index("idx_forms_folder_id").using("btree", table.folderId.asc().nullsLast().op("int4_ops")),
+	index("idx_forms_organization_id").using("btree", table.organizationId.asc().nullsLast().op("int4_ops")),
+	uniqueIndex("uq_forms_url_id").using("btree", table.urlId.asc().nullsLast().op("uuid_ops")),
+	foreignKey({
+			columns: [table.adminId],
+			foreignColumns: [users.id],
+			name: "fk_form_admin"
+		}).onDelete("cascade"),
+	foreignKey({
+			columns: [table.folderId],
+			foreignColumns: [folders.id],
+			name: "fk_form_folder"
+		}).onDelete("set null"),
+	foreignKey({
+			columns: [table.organizationId],
+			foreignColumns: [organizations.id],
+			name: "fk_form_organization"
+		}).onDelete("set null"),
+	unique("uq_form_public_token").on(table.publicToken),
+	check("chk_form_status", sql`(status)::text = ANY ((ARRAY['draft'::character varying, 'active'::character varying, 'closed'::character varying, 'archived'::character varying])::text[])`),
+	check("chk_access_type", sql`(access_type)::text = ANY ((ARRAY['public'::character varying, 'organization'::character varying, 'specific'::character varying])::text[])`),
 ]);
 
 export const canonicalTopics = pgTable("canonical_topics", {

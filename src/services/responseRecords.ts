@@ -2,7 +2,7 @@ import { asc, eq, sql } from "drizzle-orm";
 
 import { answers, db, fieldOptions, formFields, submissions, users } from "../db/client";
 import { normalizeDbTimestamp } from "../utils/timestamp";
-import { requireFormAccess } from "./formAccess";
+import { namesHiddenFor, requireFormAccess } from "./formAccess";
 
 export type ResponseField = { id: number; title: string; section: "demographic" | "feedback"; type: string };
 
@@ -81,10 +81,11 @@ export async function loadResponseRecords(formId: number, adminId: number) {
     bySubmission.set(row.submissionId, byField);
   }
 
+  const hideNames = namesHiddenFor(form, adminId);
   const records: ResponseRecord[] = subs.map((sub) => ({
     id: sub.id,
     submittedAt: sub.createdAt ? normalizeDbTimestamp(sub.createdAt) : null,
-    respondentName: sub.respondentName,
+    respondentName: hideNames ? null : sub.respondentName,
     answers: bySubmission.get(sub.id) ?? new Map(),
   }));
 

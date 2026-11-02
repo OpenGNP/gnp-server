@@ -6,9 +6,9 @@ export const usersRelations = relations(users, ({one, many}) => ({
 		fields: [users.organizationId],
 		references: [organizations.id]
 	}),
-	forms: many(forms),
 	folders: many(folders),
 	submissions: many(submissions),
+	forms: many(forms),
 	formAllowedUsers: many(formAllowedUsers),
 	formCollaborators_invitedBy: many(formCollaborators, {
 		relationName: "formCollaborators_invitedBy_users_id"
@@ -36,6 +36,7 @@ export const formFieldsRelations = relations(formFields, ({one, many}) => ({
 
 export const formsRelations = relations(forms, ({one, many}) => ({
 	formFields: many(formFields),
+	submissions: many(submissions),
 	user: one(users, {
 		fields: [forms.adminId],
 		references: [users.id]
@@ -48,7 +49,6 @@ export const formsRelations = relations(forms, ({one, many}) => ({
 		fields: [forms.organizationId],
 		references: [organizations.id]
 	}),
-	submissions: many(submissions),
 	canonicalTopics: many(canonicalTopics),
 	formAllowedUsers: many(formAllowedUsers),
 	aiModelRuns: many(aiModelRuns),
@@ -57,7 +57,6 @@ export const formsRelations = relations(forms, ({one, many}) => ({
 }));
 
 export const foldersRelations = relations(folders, ({one, many}) => ({
-	forms: many(forms),
 	user: one(users, {
 		fields: [folders.adminId],
 		references: [users.id]
@@ -70,6 +69,7 @@ export const foldersRelations = relations(folders, ({one, many}) => ({
 	folders: many(folders, {
 		relationName: "folders_parentFolderId_folders_id"
 	}),
+	forms: many(forms),
 }));
 
 export const fieldOptionsRelations = relations(fieldOptions, ({one, many}) => ({

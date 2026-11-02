@@ -82,6 +82,14 @@ export async function resolveFormRef(ref: string, userId: number) {
   return { id: form.id, urlId: form.urlId, role };
 }
 
+/**
+ * Whether `userId` gets respondents' names hidden on this form: viewers do, unless the
+ * owner turned on "Show names to viewers" when sharing. Call after requireFormAccess.
+ */
+export function namesHiddenFor(form: { adminId: number; showNamesToViewers: boolean }, userId: number) {
+  return form.adminId !== userId && !form.showNamesToViewers;
+}
+
 /** Loads a form for a request that needs `level` access: 404 if missing, 403 if not allowed. */
 export async function requireFormAccess(formId: number, userId: number, level: FormAccessLevel) {
   const [form] = await db.select().from(forms).where(eq(forms.id, formId)).limit(1);

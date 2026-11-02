@@ -15,7 +15,7 @@ import {
 } from "../db/client";
 import { normalizeDbTimestamp, parseDbTimestamp } from "../utils/timestamp";
 import { createCalendar, resolveTimeZone, type Calendar } from "../utils/timezone";
-import { requireFormAccess } from "./formAccess";
+import { namesHiddenFor, requireFormAccess } from "./formAccess";
 import { activeViolationSql } from "./violationReview";
 import { loadResponseRecords } from "./responseRecords";
 
@@ -675,7 +675,8 @@ export const analyticsService = {
    * checkbox → bar (`multi-choice`), text/textarea → response list (`text`).
    */
   async formResponses(formId: number, adminId: number) {
-    await requireFormAccess(formId, adminId, "view");
+    const form = await requireFormAccess(formId, adminId, "view");
+    const hideNames = namesHiddenFor(form, adminId);
 
     const fields = await db
       .select({
@@ -773,7 +774,7 @@ export const analyticsService = {
           title,
           responses: textRows
             .filter((row) => row.fieldId === field.id && row.text && row.text.trim() !== "")
-            .map((row) => ({ text: row.text as string, respondentName: row.respondentName ?? null })),
+            .map((row) => ({ text: row.text as string, respondentName: hideNames ? null : (row.respondentName ?? null) })),
         };
       }
 
@@ -1045,7 +1046,7 @@ export const analyticsService = {
         originalFeedback: row.originalFeedback ?? row.pointText ?? "",
         submissionId: row.submissionId,
         submittedAt: row.submittedAt ?? new Date().toISOString(),
-        respondentName: row.respondentName ?? null,
+        respondentName: namesHiddenFor(form, adminId) ? null : (row.respondentName ?? null),
         volumeBucket: bucketOfRow.get(row) ?? null,
         demographics: [...(demoBySubmission.get(row.submissionId) ?? [])]
           .sort((a, b) => a.order - b.order)

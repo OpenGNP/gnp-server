@@ -38,7 +38,7 @@ export const collaboratorService = {
    * list, an email needs no account yet — access is matched by email at open time
    * (formRoleFor); `userId` is filled in where an account already exists.
    */
-  async replace(formId: number, adminId: number, emails: string[]) {
+  async replace(formId: number, adminId: number, emails: string[], showNamesToViewers?: boolean) {
     const form = await requireFormAccess(formId, adminId, "manage");
     const [owner] = await db.select({ email: users.email }).from(users).where(eq(users.id, form.adminId));
 
@@ -48,6 +48,9 @@ export const collaboratorService = {
     if (unique.length > MAX_VIEWERS) throw badRequest(`A form can be shared with at most ${MAX_VIEWERS} people`);
 
     await db.transaction(async (tx) => {
+      if (showNamesToViewers !== undefined) {
+        await tx.update(forms).set({ showNamesToViewers }).where(eq(forms.id, formId));
+      }
       // Keep existing rows (and their created_at); only add / remove the difference.
       const current = await tx
         .select({ id: formCollaborators.id, email: formCollaborators.email })

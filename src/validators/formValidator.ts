@@ -135,5 +135,7 @@ export type UploadCoverImageInput = z.infer<typeof uploadCoverImageSchema>;
 /** The full viewer list for PUT /forms/:id/collaborators (replaces what's there). */
 export const replaceCollaboratorsSchema = z.object({
   emails: z.array(z.email().trim().toLowerCase()).max(50),
+  /** Omitted: left as it is. */
+  showNamesToViewers: z.boolean().optional(),
 });
 export type ReplaceCollaboratorsInput = z.infer<typeof replaceCollaboratorsSchema>;

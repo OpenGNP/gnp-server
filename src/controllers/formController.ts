@@ -29,8 +29,8 @@ export const formController = {
     return collaboratorService.list(id, adminId);
   },
 
-  replaceCollaborators(id: number, adminId: number, emails: string[]) {
-    return collaboratorService.replace(id, adminId, emails);
+  replaceCollaborators(id: number, adminId: number, emails: string[], showNamesToViewers?: boolean) {
+    return collaboratorService.replace(id, adminId, emails, showNamesToViewers);
   },
 
   resolveRef(ref: string, adminId: number) {
