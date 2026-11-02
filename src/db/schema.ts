@@ -311,6 +311,7 @@ export const points = pgTable("points", {
 	violationReviewedBy: integer("violation_reviewed_by"),
 	violationReviewedAt: timestamp("violation_reviewed_at", { withTimezone: true, mode: 'string' }),
 	violationType: varchar("violation_type", { length: 20 }),
+	violationReviewedStatus: varchar("violation_reviewed_status", { length: 20 }),
 }, (table) => [
 	index("idx_points_answer_id").using("btree", table.answerId.asc().nullsLast().op("int4_ops")),
 	index("idx_points_pending").using("btree", table.id.asc().nullsLast().op("int4_ops")).where(sql`((processing_status)::text = 'pending'::text)`),
@@ -333,6 +334,7 @@ export const points = pgTable("points", {
 	check("chk_sentiment", sql`(sentiment_label)::text = ANY ((ARRAY['positive'::character varying, 'neutral'::character varying, 'negative'::character varying])::text[])`),
 	check("chk_processing", sql`(processing_status)::text = ANY (ARRAY[('pending'::character varying)::text, ('assigned'::character varying)::text, ('unknown'::character varying)::text, ('clustered'::character varying)::text])`),
 	check("chk_status_topic", sql`((processing_status)::text = 'assigned'::text) = (canonical_topic_id IS NOT NULL)`),
+	check("chk_violation_reviewed_status", sql`(violation_reviewed_status)::text = ANY (ARRAY[('none'::character varying)::text, ('possible'::character varying)::text, ('violation'::character varying)::text, ('confirmed'::character varying)::text, ('dismissed'::character varying)::text])`),
 	check("chk_labels_together", sql`(sentiment_label IS NULL) = (is_violation IS NULL)`),
 	check("chk_violation_status", sql`(violation_status)::text = ANY ((ARRAY['none'::character varying, 'possible'::character varying, 'violation'::character varying, 'confirmed'::character varying, 'dismissed'::character varying])::text[])`),
 	check("chk_violation_type", sql`(violation_type)::text = ANY ((ARRAY['none'::character varying, 'legal'::character varying, 'moral'::character varying, 'ethics'::character varying])::text[])`),
