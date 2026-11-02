@@ -206,12 +206,17 @@ async function loadThemesTables(formId: number, adminId: number, opts: ThemesExp
   ]);
   const responseNumber = new Map(order.map((row, index) => [row.id, index + 1]));
   // As the screen lists them: the chosen order, uncategorised last, and for Priority
-  // violation topics first.
+  // violation topics first, most violations first.
   const pinViolations = opts.sort === "priority";
   const pinRank = (topic: { id: string; hasViolation: boolean }) =>
     topic.id === "uncategorised" ? 2 : pinViolations && topic.hasViolation ? 0 : 1;
+  const violationsIn = new Map(
+    themes.aiDiscoveredTopics.map((topic) => [topic.id, topic.feedbackSegment.filter((p) => p.violation).length]),
+  );
+  const byViolations = (a: { id: string }, b: { id: string }, rank: number) =>
+    rank === 0 ? violationsIn.get(b.id)! - violationsIn.get(a.id)! : 0;
   const topics = [...themes.aiDiscoveredTopics].sort(
-    (a, b) => pinRank(a) - pinRank(b) || TOPIC_SORTS[opts.sort].compare(a, b),
+    (a, b) => pinRank(a) - pinRank(b) || byViolations(a, b, pinRank(a)) || TOPIC_SORTS[opts.sort].compare(a, b),
   );
   const share = (part: number, whole: number) => (whole > 0 ? part / whole : 0);
 
