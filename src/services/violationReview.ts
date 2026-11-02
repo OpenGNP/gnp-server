@@ -18,7 +18,12 @@ export type ViolationReview = "confirmed" | "dismissed" | null;
  */
 export async function reviewPointViolation(pointId: number, userId: number, review: ViolationReview) {
   const [point] = await db
-    .select({ formId: submissions.formId, isViolation: points.isViolation, reviewed: points.violationReviewedStatus })
+    .select({
+      formId: submissions.formId,
+      isViolation: points.isViolation,
+      aiStatus: points.violationStatus,
+      reviewed: points.violationReviewedStatus,
+    })
     .from(points)
     .innerJoin(answers, eq(points.answerId, answers.id))
     .innerJoin(submissions, eq(answers.submissionId, submissions.id))
@@ -36,4 +41,19 @@ export async function reviewPointViolation(pointId: number, userId: number, revi
         : { violationReviewedStatus: review, violationReviewedBy: userId, violationReviewedAt: new Date().toISOString() },
     )
     .where(eq(points.id, pointId));
+
+  return reviewedState(review, Boolean(point.isViolation), point.aiStatus);
+}
+
+/** How a point reads after a review, so the client can show it without a refetch (undo included). */
+export function reviewedState(review: ViolationReview, aiFlagged: boolean, aiStatus: string | null) {
+  const violation = review === "confirmed" || (review === null && aiFlagged);
+  const violationStatus = !violation
+    ? null
+    : review === "confirmed"
+      ? "confirmed"
+      : aiStatus === "possible"
+        ? "possible"
+        : "violation";
+  return { violation, violationStatus } as const;
 }

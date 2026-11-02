@@ -67,7 +67,9 @@ export type ThemeFeedbackPoint = {
   violationStatus: "possible" | "violation" | "confirmed" | null;
   /** The AI's category (legal / moral / ethics), when flagged. */
   violationType: string | null;
-  /** Who confirmed it, and when (null until reviewed). */
+  /** A reviewer marked it not a violation: no tag, but the owner can still undo it. */
+  dismissed: boolean;
+  /** Who confirmed or dismissed it, and when (null until reviewed). */
   reviewedBy: string | null;
   reviewedAt: string | null;
   quote: string;
@@ -995,8 +997,9 @@ export const analyticsService = {
         violation: Boolean(row.violation),
         violationStatus: !row.violation ? null : row.reviewedStatus === "confirmed" ? "confirmed" : violationLevel(row.violationStatus),
         violationType: row.violation ? (row.violationType ?? null) : null,
-        reviewedBy: row.reviewedStatus === "confirmed" ? (row.reviewedBy ?? "Someone") : null,
-        reviewedAt: row.reviewedStatus === "confirmed" ? (row.reviewedAt ?? null) : null,
+        dismissed: row.reviewedStatus === "dismissed",
+        reviewedBy: row.reviewedStatus ? (row.reviewedBy ?? "Someone") : null,
+        reviewedAt: row.reviewedStatus ? (row.reviewedAt ?? null) : null,
         quote: row.pointText ?? "",
         originalFeedback: row.originalFeedback ?? row.pointText ?? "",
         submissionId: row.submissionId,

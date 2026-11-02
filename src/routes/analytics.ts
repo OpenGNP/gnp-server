@@ -34,8 +34,8 @@ export const analyticsRoutes = new Elysia({ prefix: "/analytics" })
     "/points/:id/violation",
     async ({ params, body, currentUser }) => {
       assertCurrentUser(currentUser);
-      await reviewPointViolation(parseIntParam(params.id, "point id"), currentUser.id, body.status);
-      return successResponse("Violation review saved", null);
+      const data = await reviewPointViolation(parseIntParam(params.id, "point id"), currentUser.id, body.status);
+      return successResponse("Violation review saved", data);
     },
     {
       body: reviewViolationSchema,
