@@ -9,7 +9,7 @@
       "Buddy scheme",
       "Staff car park"
     ],
-    "text": null
+    "text": "My manager actually listens when I raise something."
   },
   {
     "submittedAt": "2026-09-01T16:44:00.000Z",
@@ -21,7 +21,7 @@
       "Buddy scheme",
       "Staff car park"
     ],
-    "text": null
+    "text": "Night shift overtime is paid a month late, which makes budgeting really hard when rent is due on the first."
   },
   {
     "submittedAt": "2026-09-01T17:37:00.000Z",
@@ -33,7 +33,7 @@
       "Buddy scheme",
       "Staff car park"
     ],
-    "text": null
+    "text": "Swapped a shift with Nok this week and it was approved the same afternoon. No complaints."
   },
   {
     "submittedAt": "2026-09-01T18:30:00.000Z",
@@ -44,7 +44,7 @@
       "Buddy scheme",
       "Staff car park"
     ],
-    "text": null
+    "text": "First week was great, but nobody showed me the HR system."
   },
   {
     "submittedAt": "2026-09-02T09:23:00.000Z",
@@ -54,7 +54,7 @@
     "used": [
       "Staff car park"
     ],
-    "text": null
+    "text": "The buddy system made my first month much easier."
   },
   {
     "submittedAt": "2026-09-02T10:16:00.000Z",
@@ -86,7 +86,7 @@
     "department": "Customer service",
     "shift": "Night",
     "used": [],
-    "text": "Our team lead jokes about which of us are \"too old\" to learn the new system."
+    "text": "Nobody has ever explained how overtime is rounded."
   },
   {
     "submittedAt": "2026-09-03T14:48:00.000Z",
@@ -94,7 +94,7 @@
     "department": "Warehouse",
     "shift": "Day",
     "used": [],
-    "text": "The buddy system made my first month much easier."
+    "text": "Getting a swap approved takes days if my supervisor is away."
   },
   {
     "submittedAt": "2026-09-03T15:41:00.000Z",
@@ -102,7 +102,7 @@
     "department": "Warehouse",
     "shift": "Day",
     "used": [],
-    "text": "First week was great, but nobody showed me the HR system."
+    "text": "My manager is fine, but our one-to-ones keep getting cancelled."
   },
   {
     "submittedAt": "2026-09-03T16:34:00.000Z",
@@ -110,23 +110,7 @@
     "department": "Operations",
     "shift": "Day",
     "used": [],
-    "text": "First week was great, but nobody showed me the HR system."
-  },
-  {
-    "submittedAt": "2026-09-04T17:27:00.000Z",
-    "name": "Ploy T.",
-    "department": "Finance",
-    "shift": "Night",
-    "used": [],
-    "text": "First week was great, but nobody showed me the HR system."
-  },
-  {
-    "submittedAt": "2026-09-04T18:20:00.000Z",
-    "name": "Nok S.",
-    "department": "Customer service",
-    "shift": "Day",
-    "used": [],
-    "text": "Training was rushed; I learned the system from a colleague."
+    "text": "My supervisor checks in every week. It helps more than I expected."
   },
   {
     "submittedAt": "2026-09-04T09:13:00.000Z",
@@ -134,7 +118,7 @@
     "department": "Customer service",
     "shift": "Day",
     "used": [],
-    "text": "Training was rushed; I learned the system from a colleague."
+    "text": "Overtime on my payslip never matches what I worked."
   },
   {
     "submittedAt": "2026-09-04T10:06:00.000Z",
@@ -142,7 +126,23 @@
     "department": "Warehouse",
     "shift": "Day",
     "used": [],
-    "text": "When I raised the rota problem, my manager fixed it the same day."
+    "text": "All good."
+  },
+  {
+    "submittedAt": "2026-09-04T17:27:00.000Z",
+    "name": "Ploy T.",
+    "department": "Finance",
+    "shift": "Night",
+    "used": [],
+    "text": null
+  },
+  {
+    "submittedAt": "2026-09-04T18:20:00.000Z",
+    "name": "Nok S.",
+    "department": "Customer service",
+    "shift": "Day",
+    "used": [],
+    "text": null
   },
   {
     "submittedAt": "2026-09-05T11:59:00.000Z",
@@ -150,7 +150,7 @@
     "department": "Warehouse",
     "shift": "Night",
     "used": [],
-    "text": "My supervisor checks in every week. It helps more than I expected."
+    "text": "Meetings with our team lead feel tense."
   },
   {
     "submittedAt": "2026-09-05T12:52:00.000Z",
@@ -158,7 +158,7 @@
     "department": "Operations",
     "shift": "Day",
     "used": [],
-    "text": "My manager actually listens when I raise something."
+    "text": "Overtime pay is wrong again."
   },
   {
     "submittedAt": "2026-09-05T13:45:00.000Z",
@@ -168,7 +168,7 @@
     "used": [
       "Staff car park"
     ],
-    "text": "My manager is hard to reach on night shifts."
+    "text": null
   },
   {
     "submittedAt": "2026-09-05T14:38:00.000Z",
@@ -178,7 +178,7 @@
     "used": [
       "Staff car park"
     ],
-    "text": "Payroll fixed my missing overtime the same week."
+    "text": null
   },
   {
     "submittedAt": "2026-09-06T15:31:00.000Z",
@@ -188,7 +188,7 @@
     "used": [
       "Staff car park"
     ],
-    "text": "Nobody has ever explained how overtime is rounded."
+    "text": "I waited four days for a swap to be approved and ended up working the shift anyway."
   },
   {
     "submittedAt": "2026-09-06T16:24:00.000Z",
@@ -198,7 +198,7 @@
     "used": [
       "Staff car park"
     ],
-    "text": "Night shift overtime is paid a month late."
+    "text": null
   },
   {
     "submittedAt": "2026-09-06T17:17:00.000Z",
@@ -208,7 +208,7 @@
     "used": [
       "Staff car park"
     ],
-    "text": "Payroll answers my emails, but the numbers are still wrong."
+    "text": null
   },
   {
     "submittedAt": "2026-09-06T18:10:00.000Z",
@@ -218,7 +218,7 @@
     "used": [
       "Staff car park"
     ],
-    "text": "Overtime on my payslip never matches what I worked."
+    "text": null
   },
   {
     "submittedAt": "2026-09-07T09:03:00.000Z",
@@ -228,7 +228,7 @@
     "used": [
       "Staff car park"
     ],
-    "text": "Swaps are fine if your manager is in, slow if they are on leave."
+    "text": null
   },
   {
     "submittedAt": "2026-09-07T10:56:00.000Z",
@@ -238,7 +238,7 @@
     "used": [
       "Staff car park"
     ],
-    "text": "Getting a swap approved takes days if my supervisor is away."
+    "text": "My manager is hard to reach on night shifts."
   },
   {
     "submittedAt": "2026-09-07T11:49:00.000Z",
@@ -248,7 +248,7 @@
     "used": [
       "Staff car park"
     ],
-    "text": "Swapping a shift still means three emails and a phone call."
+    "text": null
   },
   {
     "submittedAt": "2026-09-08T12:42:00.000Z",
@@ -268,7 +268,7 @@
     "used": [
       "Staff car park"
     ],
-    "text": null
+    "text": "Training was rushed; I learned the system from a colleague."
   },
   {
     "submittedAt": "2026-09-08T14:28:00.000Z",
@@ -291,6 +291,18 @@
     "text": null
   },
   {
+    "submittedAt": "2026-09-09T09:53:00.000Z",
+    "name": "Ying L.",
+    "department": "Warehouse",
+    "shift": "Day",
+    "used": [
+      "Shift swap form",
+      "Payroll helpdesk",
+      "Buddy scheme"
+    ],
+    "text": "Payroll helpdesk was quick to reply this time."
+  },
+  {
     "submittedAt": "2026-09-09T16:14:00.000Z",
     "name": "Anan H.",
     "department": "Customer service",
@@ -300,7 +312,7 @@
       "Payroll helpdesk",
       "Buddy scheme"
     ],
-    "text": null
+    "text": "Overtime is a mystery."
   },
   {
     "submittedAt": "2026-09-09T17:07:00.000Z",
@@ -312,7 +324,7 @@
       "Payroll helpdesk",
       "Buddy scheme"
     ],
-    "text": null
+    "text": "Our team lead jokes about which of us are \"too old\" to learn the new system."
   },
   {
     "submittedAt": "2026-09-09T18:00:00.000Z",
@@ -327,18 +339,6 @@
     "text": null
   },
   {
-    "submittedAt": "2026-09-09T09:53:00.000Z",
-    "name": "Ying L.",
-    "department": "Warehouse",
-    "shift": "Day",
-    "used": [
-      "Shift swap form",
-      "Payroll helpdesk",
-      "Buddy scheme"
-    ],
-    "text": "Older staff get called \"dinosaurs\" in our team meetings."
-  },
-  {
     "submittedAt": "2026-09-10T10:46:00.000Z",
     "name": "Chai B.",
     "department": "Operations",
@@ -347,7 +347,7 @@
       "Shift swap form",
       "Payroll helpdesk"
     ],
-    "text": "The buddy system made my first month much easier."
+    "text": null
   },
   {
     "submittedAt": "2026-09-10T11:39:00.000Z",
@@ -358,7 +358,7 @@
       "Shift swap form",
       "Payroll helpdesk"
     ],
-    "text": "First week was great, but nobody showed me the HR system."
+    "text": "Swaps are fine if your manager is in, slow if they are on leave."
   },
   {
     "submittedAt": "2026-09-10T12:32:00.000Z",
@@ -369,7 +369,7 @@
       "Shift swap form",
       "Payroll helpdesk"
     ],
-    "text": "First week was great, but nobody showed me the HR system."
+    "text": "Nothing to add, thanks."
   },
   {
     "submittedAt": "2026-09-10T13:25:00.000Z",
@@ -380,7 +380,7 @@
       "Shift swap form",
       "Payroll helpdesk"
     ],
-    "text": "Training was rushed; I learned the system from a colleague."
+    "text": null
   },
   {
     "submittedAt": "2026-09-11T14:18:00.000Z",
@@ -391,7 +391,7 @@
       "Shift swap form",
       "Payroll helpdesk"
     ],
-    "text": "Training was rushed; I learned the system from a colleague."
+    "text": null
   },
   {
     "submittedAt": "2026-09-11T15:11:00.000Z",
@@ -402,7 +402,7 @@
       "Shift swap form",
       "Payroll helpdesk"
     ],
-    "text": "When I raised the rota problem, my manager fixed it the same day."
+    "text": null
   },
   {
     "submittedAt": "2026-09-11T16:04:00.000Z",
@@ -413,7 +413,7 @@
       "Shift swap form",
       "Payroll helpdesk"
     ],
-    "text": "My supervisor checks in every week. It helps more than I expected."
+    "text": "Payroll answers my emails, but the numbers are still wrong."
   },
   {
     "submittedAt": "2026-09-11T17:57:00.000Z",
@@ -425,19 +425,7 @@
       "Payroll helpdesk",
       "Staff car park"
     ],
-    "text": "My manager actually listens when I raise something."
-  },
-  {
-    "submittedAt": "2026-09-12T18:50:00.000Z",
-    "name": "Nok P.",
-    "department": "Customer service",
-    "shift": "Day",
-    "used": [
-      "Shift swap form",
-      "Payroll helpdesk",
-      "Staff car park"
-    ],
-    "text": "My manager is fine, but our one-to-ones keep getting cancelled."
+    "text": "Swapping a shift still means three emails and a phone call."
   },
   {
     "submittedAt": "2026-09-12T09:43:00.000Z",
@@ -449,7 +437,7 @@
       "Payroll helpdesk",
       "Staff car park"
     ],
-    "text": "My manager is fine, but our one-to-ones keep getting cancelled."
+    "text": null
   },
   {
     "submittedAt": "2026-09-12T10:36:00.000Z",
@@ -461,7 +449,7 @@
       "Payroll helpdesk",
       "Staff car park"
     ],
-    "text": "Nobody has ever explained how overtime is rounded."
+    "text": "I put in a swap on Monday and heard back on Thursday. It worked out, but only just."
   },
   {
     "submittedAt": "2026-09-12T11:29:00.000Z",
@@ -472,7 +460,19 @@
       "Shift swap form",
       "Staff car park"
     ],
-    "text": "Nobody has ever explained how overtime is rounded."
+    "text": null
+  },
+  {
+    "submittedAt": "2026-09-12T18:50:00.000Z",
+    "name": "Nok P.",
+    "department": "Customer service",
+    "shift": "Day",
+    "used": [
+      "Shift swap form",
+      "Payroll helpdesk",
+      "Staff car park"
+    ],
+    "text": "My buddy checked in every day of my first week. Really appreciated it."
   },
   {
     "submittedAt": "2026-09-13T12:22:00.000Z",
@@ -483,7 +483,7 @@
       "Shift swap form",
       "Staff car park"
     ],
-    "text": "Night shift overtime is paid a month late."
+    "text": null
   },
   {
     "submittedAt": "2026-09-13T13:15:00.000Z",
@@ -494,7 +494,7 @@
       "Shift swap form",
       "Staff car park"
     ],
-    "text": "Payroll answers my emails, but the numbers are still wrong."
+    "text": "I worked 9 hours of overtime in August and was paid for 6. When I asked, I was told overtime is rounded down to the nearest half day, which nobody mentioned when I signed up for the extra shifts."
   },
   {
     "submittedAt": "2026-09-13T14:08:00.000Z",
@@ -505,7 +505,7 @@
       "Shift swap form",
       "Staff car park"
     ],
-    "text": "Overtime on my payslip never matches what I worked."
+    "text": "When I raised the rota problem, my manager fixed it the same day."
   },
   {
     "submittedAt": "2026-09-14T15:01:00.000Z",
@@ -516,7 +516,7 @@
       "Shift swap form",
       "Staff car park"
     ],
-    "text": "Swaps are fine if your manager is in, slow if they are on leave."
+    "text": null
   },
   {
     "submittedAt": "2026-09-14T16:54:00.000Z",
@@ -527,7 +527,7 @@
       "Shift swap form",
       "Staff car park"
     ],
-    "text": "I waited four days for a swap to be approved."
+    "text": null
   },
   {
     "submittedAt": "2026-09-14T17:47:00.000Z",
@@ -537,16 +537,6 @@
     "used": [
       "Shift swap form",
       "Staff car park"
-    ],
-    "text": "I gave up asking for swaps and just work sick now."
-  },
-  {
-    "submittedAt": "2026-09-15T18:40:00.000Z",
-    "name": "Kanya W.",
-    "department": "Finance",
-    "shift": "Night",
-    "used": [
-      "Shift swap form"
     ],
     "text": null
   },
@@ -581,6 +571,16 @@
     "text": null
   },
   {
+    "submittedAt": "2026-09-15T18:40:00.000Z",
+    "name": "Kanya W.",
+    "department": "Finance",
+    "shift": "Night",
+    "used": [
+      "Shift swap form"
+    ],
+    "text": "Induction was short but clear."
+  },
+  {
     "submittedAt": "2026-09-16T12:12:00.000Z",
     "name": "Ploy P.",
     "department": "Warehouse",
@@ -608,7 +608,7 @@
     "used": [
       "Shift swap form"
     ],
-    "text": null
+    "text": "Getting cover for a swap is on us, and the form still needs a manager signature."
   },
   {
     "submittedAt": "2026-09-16T15:51:00.000Z",
@@ -618,40 +618,7 @@
     "used": [
       "Shift swap form"
     ],
-    "text": null
-  },
-  {
-    "submittedAt": "2026-09-17T16:44:00.000Z",
-    "name": "Anan M.",
-    "department": "Warehouse",
-    "shift": "Night",
-    "used": [
-      "Shift swap form",
-      "Buddy scheme"
-    ],
-    "text": "Our team lead can be blunt with older colleagues."
-  },
-  {
-    "submittedAt": "2026-09-17T17:37:00.000Z",
-    "name": "Malee D.",
-    "department": "Warehouse",
-    "shift": "Day",
-    "used": [
-      "Shift swap form",
-      "Buddy scheme"
-    ],
-    "text": "He says people over 50 should just retire instead of asking for training."
-  },
-  {
-    "submittedAt": "2026-09-17T18:30:00.000Z",
-    "name": "Somchai L.",
-    "department": "Operations",
-    "shift": "Day",
-    "used": [
-      "Shift swap form",
-      "Buddy scheme"
-    ],
-    "text": "The buddy system made my first month much easier."
+    "text": "My supervisor rarely checks in, so problems stay unresolved for weeks."
   },
   {
     "submittedAt": "2026-09-17T09:23:00.000Z",
@@ -662,7 +629,40 @@
       "Shift swap form",
       "Buddy scheme"
     ],
-    "text": "The buddy system made my first month much easier."
+    "text": "Nobody showed me how to book leave in the HR system."
+  },
+  {
+    "submittedAt": "2026-09-17T16:44:00.000Z",
+    "name": "Anan M.",
+    "department": "Warehouse",
+    "shift": "Night",
+    "used": [
+      "Shift swap form",
+      "Buddy scheme"
+    ],
+    "text": null
+  },
+  {
+    "submittedAt": "2026-09-17T17:37:00.000Z",
+    "name": "Malee D.",
+    "department": "Warehouse",
+    "shift": "Day",
+    "used": [
+      "Shift swap form",
+      "Buddy scheme"
+    ],
+    "text": "Our team lead can be blunt with older colleagues."
+  },
+  {
+    "submittedAt": "2026-09-17T18:30:00.000Z",
+    "name": "Somchai L.",
+    "department": "Operations",
+    "shift": "Day",
+    "used": [
+      "Shift swap form",
+      "Buddy scheme"
+    ],
+    "text": "Good manager, good team."
   },
   {
     "submittedAt": "2026-09-18T10:16:00.000Z",
@@ -673,7 +673,7 @@
       "Shift swap form",
       "Buddy scheme"
     ],
-    "text": "First week was great, but nobody showed me the HR system."
+    "text": "My manager actually listens when I raise something."
   },
   {
     "submittedAt": "2026-09-18T11:09:00.000Z",
@@ -684,7 +684,7 @@
       "Shift swap form",
       "Staff car park"
     ],
-    "text": "First week was great, but nobody showed me the HR system."
+    "text": null
   },
   {
     "submittedAt": "2026-09-18T12:02:00.000Z",
@@ -695,7 +695,7 @@
       "Shift swap form",
       "Staff car park"
     ],
-    "text": "Training was rushed; I learned the system from a colleague."
+    "text": "Can someone explain the overtime rate for bank holidays? Two people gave me two different answers."
   },
   {
     "submittedAt": "2026-09-18T13:55:00.000Z",
@@ -706,7 +706,7 @@
       "Shift swap form",
       "Staff car park"
     ],
-    "text": "When I raised the rota problem, my manager fixed it the same day."
+    "text": "Swap approved within the hour. Good."
   },
   {
     "submittedAt": "2026-09-19T14:48:00.000Z",
@@ -717,7 +717,7 @@
       "Shift swap form",
       "Staff car park"
     ],
-    "text": "My supervisor checks in every week. It helps more than I expected."
+    "text": "The canteen could open earlier for the morning shift."
   },
   {
     "submittedAt": "2026-09-19T15:41:00.000Z",
@@ -728,7 +728,7 @@
       "Shift swap form",
       "Staff car park"
     ],
-    "text": "My manager actually listens when I raise something."
+    "text": null
   },
   {
     "submittedAt": "2026-09-19T16:34:00.000Z",
@@ -738,7 +738,7 @@
     "used": [
       "Staff car park"
     ],
-    "text": "My manager is fine, but our one-to-ones keep getting cancelled."
+    "text": "Honestly most of this month was fine. My supervisor checks in every week and the buddy scheme is better than at my last job. The one thing that keeps dragging is overtime: I did 11 extra hours in August and my payslip shows 7. I've emailed payroll twice and both times got a polite reply and no fix."
   },
   {
     "submittedAt": "2026-09-19T17:27:00.000Z",
@@ -749,18 +749,7 @@
       "Payroll helpdesk",
       "Staff car park"
     ],
-    "text": "My manager is hard to reach on night shifts."
-  },
-  {
-    "submittedAt": "2026-09-20T18:20:00.000Z",
-    "name": "Nok H.",
-    "department": "Warehouse",
-    "shift": "Night",
-    "used": [
-      "Payroll helpdesk",
-      "Staff car park"
-    ],
-    "text": "Payroll fixed my missing overtime the same week."
+    "text": null
   },
   {
     "submittedAt": "2026-09-20T09:13:00.000Z",
@@ -771,7 +760,7 @@
       "Payroll helpdesk",
       "Staff car park"
     ],
-    "text": "Night shift overtime is paid a month late."
+    "text": null
   },
   {
     "submittedAt": "2026-09-20T10:06:00.000Z",
@@ -782,7 +771,7 @@
       "Payroll helpdesk",
       "Staff car park"
     ],
-    "text": "Payroll answers my emails, but the numbers are still wrong."
+    "text": null
   },
   {
     "submittedAt": "2026-09-20T11:59:00.000Z",
@@ -793,7 +782,18 @@
       "Payroll helpdesk",
       "Staff car park"
     ],
-    "text": "Overtime on my payslip never matches what I worked."
+    "text": null
+  },
+  {
+    "submittedAt": "2026-09-20T18:20:00.000Z",
+    "name": "Nok H.",
+    "department": "Warehouse",
+    "shift": "Night",
+    "used": [
+      "Payroll helpdesk",
+      "Staff car park"
+    ],
+    "text": "Overtime on nights is always late."
   },
   {
     "submittedAt": "2026-09-21T12:52:00.000Z",
@@ -803,7 +803,7 @@
     "used": [
       "Payroll helpdesk"
     ],
-    "text": "Swaps are fine if your manager is in, slow if they are on leave."
+    "text": null
   },
   {
     "submittedAt": "2026-09-21T13:45:00.000Z",
@@ -813,7 +813,7 @@
     "used": [
       "Payroll helpdesk"
     ],
-    "text": "I gave up asking for swaps and just work sick now."
+    "text": "First week was great."
   },
   {
     "submittedAt": "2026-09-21T14:38:00.000Z",
@@ -823,7 +823,7 @@
     "used": [
       "Payroll helpdesk"
     ],
-    "text": "Getting a swap approved takes days if my supervisor is away."
+    "text": "Fine overall."
   },
   {
     "submittedAt": "2026-09-21T15:31:00.000Z",
@@ -833,7 +833,17 @@
     "used": [
       "Payroll helpdesk"
     ],
-    "text": "Swapping a shift still means three emails and a phone call."
+    "text": "Night shift overtime is paid a month late."
+  },
+  {
+    "submittedAt": "2026-09-22T09:03:00.000Z",
+    "name": "Tawan K.",
+    "department": "Customer service",
+    "shift": "Night",
+    "used": [
+      "Payroll helpdesk"
+    ],
+    "text": "Overtime on my payslip never matches what I worked."
   },
   {
     "submittedAt": "2026-09-22T16:24:00.000Z",
@@ -843,7 +853,7 @@
     "used": [
       "Payroll helpdesk"
     ],
-    "text": null
+    "text": "Shift swap went through fine."
   },
   {
     "submittedAt": "2026-09-22T17:17:00.000Z",
@@ -860,16 +870,6 @@
     "name": "Kanya S.",
     "department": "Customer service",
     "shift": "Day",
-    "used": [
-      "Payroll helpdesk"
-    ],
-    "text": null
-  },
-  {
-    "submittedAt": "2026-09-22T09:03:00.000Z",
-    "name": "Tawan K.",
-    "department": "Customer service",
-    "shift": "Night",
     "used": [
       "Payroll helpdesk"
     ],
@@ -903,7 +903,7 @@
     "used": [
       "Payroll helpdesk"
     ],
-    "text": null
+    "text": "Swaps are slow when the supervisor is on leave."
   },
   {
     "submittedAt": "2026-09-23T13:35:00.000Z",
@@ -913,7 +913,7 @@
     "used": [
       "Payroll helpdesk"
     ],
-    "text": "The buddy system made my first month much easier."
+    "text": "How is overtime calculated when a shift runs past midnight?"
   },
   {
     "submittedAt": "2026-09-24T14:28:00.000Z",
@@ -921,7 +921,7 @@
     "department": "Customer service",
     "shift": "Night",
     "used": [],
-    "text": "First week was great, but nobody showed me the HR system."
+    "text": null
   },
   {
     "submittedAt": "2026-09-24T15:21:00.000Z",
@@ -931,7 +931,7 @@
     "used": [
       "Staff car park"
     ],
-    "text": "First week was great, but nobody showed me the HR system."
+    "text": "I waited four days for a swap to be approved."
   },
   {
     "submittedAt": "2026-09-24T16:14:00.000Z",
@@ -941,7 +941,7 @@
     "used": [
       "Staff car park"
     ],
-    "text": "Training was rushed; I learned the system from a colleague."
+    "text": null
   },
   {
     "submittedAt": "2026-09-24T17:07:00.000Z",
@@ -955,17 +955,6 @@
     "text": "When I raised the rota problem, my manager fixed it the same day."
   },
   {
-    "submittedAt": "2026-09-25T18:00:00.000Z",
-    "name": "Somchai N.",
-    "department": "Finance",
-    "shift": "Night",
-    "used": [
-      "Buddy scheme",
-      "Staff car park"
-    ],
-    "text": "My supervisor checks in every week. It helps more than I expected."
-  },
-  {
     "submittedAt": "2026-09-25T09:53:00.000Z",
     "name": "Ying R.",
     "department": "Customer service",
@@ -974,7 +963,7 @@
       "Buddy scheme",
       "Staff car park"
     ],
-    "text": "My manager actually listens when I raise something."
+    "text": "My manager says they will listen, but the same problems keep being ignored."
   },
   {
     "submittedAt": "2026-09-25T10:46:00.000Z",
@@ -985,7 +974,7 @@
       "Buddy scheme",
       "Staff car park"
     ],
-    "text": "My manager is fine, but our one-to-ones keep getting cancelled."
+    "text": null
   },
   {
     "submittedAt": "2026-09-25T11:39:00.000Z",
@@ -995,7 +984,18 @@
     "used": [
       "Staff car park"
     ],
-    "text": "My manager is fine, but our one-to-ones keep getting cancelled."
+    "text": null
+  },
+  {
+    "submittedAt": "2026-09-25T18:00:00.000Z",
+    "name": "Somchai N.",
+    "department": "Finance",
+    "shift": "Night",
+    "used": [
+      "Buddy scheme",
+      "Staff car park"
+    ],
+    "text": null
   },
   {
     "submittedAt": "2026-09-26T12:32:00.000Z",
@@ -1005,7 +1005,7 @@
     "used": [
       "Staff car park"
     ],
-    "text": "Nobody has ever explained how overtime is rounded."
+    "text": null
   },
   {
     "submittedAt": "2026-09-26T13:25:00.000Z",
@@ -1015,7 +1015,7 @@
     "used": [
       "Staff car park"
     ],
-    "text": "Nobody has ever explained how overtime is rounded."
+    "text": null
   },
   {
     "submittedAt": "2026-09-26T14:18:00.000Z",
@@ -1025,7 +1025,7 @@
     "used": [
       "Staff car park"
     ],
-    "text": "Night shift overtime is paid a month late."
+    "text": "The buddy system was supposed to help, but nobody checked in after my first day."
   },
   {
     "submittedAt": "2026-09-26T15:11:00.000Z",
@@ -1033,7 +1033,7 @@
     "department": "Customer service",
     "shift": "Day",
     "used": [],
-    "text": "Payroll answers my emails, but the numbers are still wrong."
+    "text": null
   },
   {
     "submittedAt": "2026-09-27T16:04:00.000Z",
@@ -1041,7 +1041,7 @@
     "department": "Customer service",
     "shift": "Night",
     "used": [],
-    "text": "Overtime on my payslip never matches what I worked."
+    "text": "My supervisor checks in every week. It helps more than I expected."
   },
   {
     "submittedAt": "2026-09-27T17:57:00.000Z",
@@ -1051,7 +1051,7 @@
     "used": [
       "Shift swap form"
     ],
-    "text": "My team lead approved my swap within the hour this time."
+    "text": "Payroll still has not fixed my missing overtime, despite two follow-up emails."
   },
   {
     "submittedAt": "2026-09-27T18:50:00.000Z",
@@ -1061,7 +1061,7 @@
     "used": [
       "Shift swap form"
     ],
-    "text": "Swaps are fine if your manager is in, slow if they are on leave."
+    "text": null
   },
   {
     "submittedAt": "2026-09-28T09:43:00.000Z",
@@ -1071,7 +1071,7 @@
     "used": [
       "Shift swap form"
     ],
-    "text": "Getting a swap approved takes days if my supervisor is away."
+    "text": "Nobody has ever explained how overtime is rounded."
   },
   {
     "submittedAt": "2026-09-28T10:36:00.000Z",
@@ -1081,7 +1081,7 @@
     "used": [
       "Shift swap form"
     ],
-    "text": "Swapping a shift still means three emails and a phone call."
+    "text": "Overtime on my payslip never matches what I worked."
   },
   {
     "submittedAt": "2026-09-28T11:29:00.000Z",
@@ -1091,7 +1091,7 @@
     "used": [
       "Shift swap form"
     ],
-    "text": "I waited four days for a swap to be approved."
+    "text": "Six of us started on the same day and there was one trainer. We spent most of Tuesday watching videos while she dealt with laptop problems. My buddy was on leave the whole first week, so I really learned the warehouse system from the people on my shift, who were kind but clearly busy."
   },
   {
     "submittedAt": "2026-09-29T12:22:00.000Z",
@@ -1121,7 +1121,7 @@
     "used": [
       "Shift swap form"
     ],
-    "text": null
+    "text": "Training was rushed; I learned the system from a colleague."
   },
   {
     "submittedAt": "2026-09-29T15:01:00.000Z",
@@ -1130,6 +1130,17 @@
     "shift": "Day",
     "used": [
       "Shift swap form"
+    ],
+    "text": null
+  },
+  {
+    "submittedAt": "2026-09-30T09:33:00.000Z",
+    "name": "Tawan J.",
+    "department": "Warehouse",
+    "shift": "Day",
+    "used": [
+      "Shift swap form",
+      "Staff car park"
     ],
     "text": null
   },
@@ -1151,24 +1162,13 @@
     "used": [
       "Shift swap form"
     ],
-    "text": null
+    "text": "My manager is fine, but our one-to-ones keep getting cancelled."
   },
   {
     "submittedAt": "2026-09-30T18:40:00.000Z",
     "name": "Kanya P.",
     "department": "Customer service",
     "shift": "Night",
-    "used": [
-      "Shift swap form",
-      "Staff car park"
-    ],
-    "text": null
-  },
-  {
-    "submittedAt": "2026-09-30T09:33:00.000Z",
-    "name": "Tawan J.",
-    "department": "Warehouse",
-    "shift": "Day",
     "used": [
       "Shift swap form",
       "Staff car park"
@@ -1185,7 +1185,7 @@
       "Payroll helpdesk",
       "Staff car park"
     ],
-    "text": "Our team lead talks down to the older staff."
+    "text": "Swapping a shift still means three emails and a phone call."
   },
   {
     "submittedAt": "2026-10-01T11:19:00.000Z",
@@ -1197,7 +1197,7 @@
       "Payroll helpdesk",
       "Staff car park"
     ],
-    "text": "The buddy system made my first month much easier."
+    "text": "The welcome pack was helpful."
   },
   {
     "submittedAt": "2026-10-01T12:12:00.000Z",
@@ -1209,7 +1209,7 @@
       "Payroll helpdesk",
       "Staff car park"
     ],
-    "text": "First week was great, but nobody showed me the HR system."
+    "text": null
   },
   {
     "submittedAt": "2026-10-01T13:05:00.000Z",
@@ -1221,7 +1221,7 @@
       "Payroll helpdesk",
       "Staff car park"
     ],
-    "text": "Training was rushed; I learned the system from a colleague."
+    "text": "Swaps are fine if your manager is in, slow if they are on leave."
   },
   {
     "submittedAt": "2026-10-02T14:58:00.000Z",
@@ -1233,7 +1233,7 @@
       "Payroll helpdesk",
       "Staff car park"
     ],
-    "text": "When I raised the rota problem, my manager fixed it the same day."
+    "text": null
   },
   {
     "submittedAt": "2026-10-02T15:51:00.000Z",
@@ -1245,7 +1245,7 @@
       "Payroll helpdesk",
       "Staff car park"
     ],
-    "text": "My supervisor checks in every week. It helps more than I expected."
+    "text": null
   },
   {
     "submittedAt": "2026-10-02T16:44:00.000Z",
@@ -1257,7 +1257,7 @@
       "Payroll helpdesk",
       "Staff car park"
     ],
-    "text": "My manager actually listens when I raise something."
+    "text": null
   },
   {
     "submittedAt": "2026-10-02T17:37:00.000Z",
@@ -1269,7 +1269,43 @@
       "Payroll helpdesk",
       "Staff car park"
     ],
-    "text": "My manager is fine, but our one-to-ones keep getting cancelled."
+    "text": "My laptop arrived on day 3."
+  },
+  {
+    "submittedAt": "2026-10-03T09:23:00.000Z",
+    "name": "Ying T.",
+    "department": "Customer service",
+    "shift": "Day",
+    "used": [
+      "Shift swap form",
+      "Payroll helpdesk",
+      "Buddy scheme"
+    ],
+    "text": "My manager actually listens when I raise something."
+  },
+  {
+    "submittedAt": "2026-10-03T10:16:00.000Z",
+    "name": "Chai S.",
+    "department": "Warehouse",
+    "shift": "Night",
+    "used": [
+      "Shift swap form",
+      "Payroll helpdesk",
+      "Buddy scheme"
+    ],
+    "text": "Nobody told me where to collect my uniform or ID badge."
+  },
+  {
+    "submittedAt": "2026-10-03T11:09:00.000Z",
+    "name": "Dao K.",
+    "department": "Warehouse",
+    "shift": "Day",
+    "used": [
+      "Shift swap form",
+      "Payroll helpdesk",
+      "Buddy scheme"
+    ],
+    "text": null
   },
   {
     "submittedAt": "2026-10-03T18:30:00.000Z",
@@ -1282,43 +1318,7 @@
       "Buddy scheme",
       "Staff car park"
     ],
-    "text": "My manager is hard to reach on night shifts."
-  },
-  {
-    "submittedAt": "2026-10-03T09:23:00.000Z",
-    "name": "Ying T.",
-    "department": "Customer service",
-    "shift": "Day",
-    "used": [
-      "Shift swap form",
-      "Payroll helpdesk",
-      "Buddy scheme"
-    ],
-    "text": "Payroll fixed my missing overtime the same week."
-  },
-  {
-    "submittedAt": "2026-10-03T10:16:00.000Z",
-    "name": "Chai S.",
-    "department": "Warehouse",
-    "shift": "Night",
-    "used": [
-      "Shift swap form",
-      "Payroll helpdesk",
-      "Buddy scheme"
-    ],
-    "text": "Nobody has ever explained how overtime is rounded."
-  },
-  {
-    "submittedAt": "2026-10-03T11:09:00.000Z",
-    "name": "Dao K.",
-    "department": "Warehouse",
-    "shift": "Day",
-    "used": [
-      "Shift swap form",
-      "Payroll helpdesk",
-      "Buddy scheme"
-    ],
-    "text": "Night shift overtime is paid a month late."
+    "text": "First week was great, but nobody showed me the HR system."
   },
   {
     "submittedAt": "2026-10-04T12:02:00.000Z",
@@ -1329,7 +1329,7 @@
       "Shift swap form",
       "Payroll helpdesk"
     ],
-    "text": "Payroll answers my emails, but the numbers are still wrong."
+    "text": "Night shift overtime is paid late again."
   },
   {
     "submittedAt": "2026-10-04T13:55:00.000Z",
@@ -1340,7 +1340,7 @@
       "Shift swap form",
       "Payroll helpdesk"
     ],
-    "text": "Overtime on my payslip never matches what I worked."
+    "text": "Induction day was well organised."
   },
   {
     "submittedAt": "2026-10-04T14:48:00.000Z",
@@ -1351,7 +1351,7 @@
       "Shift swap form",
       "Payroll helpdesk"
     ],
-    "text": "Swaps are fine if your manager is in, slow if they are on leave."
+    "text": "Started on the 28th. The buddy scheme is brilliant, my buddy Dao answered about a hundred questions."
   },
   {
     "submittedAt": "2026-10-04T15:41:00.000Z",
@@ -1362,7 +1362,7 @@
       "Shift swap form",
       "Payroll helpdesk"
     ],
-    "text": "Getting a swap approved takes days if my supervisor is away."
+    "text": "Older staff get called \"dinosaurs\" in our team meetings. Everyone laughs, but I have stopped speaking up."
   },
   {
     "submittedAt": "2026-10-05T16:34:00.000Z",
@@ -1372,7 +1372,7 @@
     "used": [
       "Shift swap form"
     ],
-    "text": "Swapping a shift still means three emails and a phone call."
+    "text": null
   },
   {
     "submittedAt": "2026-10-05T17:27:00.000Z",
@@ -1382,7 +1382,7 @@
     "used": [
       "Shift swap form"
     ],
-    "text": "I waited four days for a swap to be approved."
+    "text": null
   },
   {
     "submittedAt": "2026-10-05T18:20:00.000Z",
@@ -1392,7 +1392,7 @@
     "used": [
       "Shift swap form"
     ],
-    "text": "I gave up asking for swaps and just work sick now."
+    "text": "Overtime for nights is a month behind."
   },
   {
     "submittedAt": "2026-10-06T09:13:00.000Z",
@@ -1412,7 +1412,7 @@
     "used": [
       "Shift swap form"
     ],
-    "text": null
+    "text": "My supervisor checks in every week. It helps more than I expected."
   },
   {
     "submittedAt": "2026-10-06T11:59:00.000Z",
@@ -1444,7 +1444,7 @@
       "Shift swap form",
       "Staff car park"
     ],
-    "text": "Parking is fine after 10, but the morning shift has nowhere to go."
+    "text": "Is there a written policy on overtime rounding anywhere?"
   },
   {
     "submittedAt": "2026-10-07T14:38:00.000Z",
@@ -1455,7 +1455,7 @@
       "Shift swap form",
       "Staff car park"
     ],
-    "text": "I park on the street and walk 15 minutes in the dark."
+    "text": "One-to-ones are cancelled so often that I no longer expect support from my supervisor."
   },
   {
     "submittedAt": "2026-10-07T15:31:00.000Z",
@@ -1466,7 +1466,7 @@
       "Shift swap form",
       "Staff car park"
     ],
-    "text": "There are 40 spaces for 120 people on the morning shift."
+    "text": null
   },
   {
     "submittedAt": "2026-10-07T16:24:00.000Z",
@@ -1477,27 +1477,7 @@
       "Shift swap form",
       "Staff car park"
     ],
-    "text": "Our team lead can be blunt with older colleagues."
-  },
-  {
-    "submittedAt": "2026-10-08T17:17:00.000Z",
-    "name": "Niran J.",
-    "department": "Warehouse",
-    "shift": "Day",
-    "used": [
-      "Staff car park"
-    ],
-    "text": "Meetings with our team lead feel tense."
-  },
-  {
-    "submittedAt": "2026-10-08T18:10:00.000Z",
-    "name": "Kanya H.",
-    "department": "Warehouse",
-    "shift": "Day",
-    "used": [
-      "Staff car park"
-    ],
-    "text": "The buddy system made my first month much easier."
+    "text": null
   },
   {
     "submittedAt": "2026-10-08T09:03:00.000Z",
@@ -1507,7 +1487,7 @@
     "used": [
       "Staff car park"
     ],
-    "text": "The buddy system made my first month much easier."
+    "text": "My team lead approved my swap within the hour this time."
   },
   {
     "submittedAt": "2026-10-08T10:56:00.000Z",
@@ -1517,7 +1497,27 @@
     "used": [
       "Staff car park"
     ],
-    "text": "Training was rushed; I learned the system from a colleague."
+    "text": "Feedback from our team lead is personal, not about the work."
+  },
+  {
+    "submittedAt": "2026-10-08T17:17:00.000Z",
+    "name": "Niran J.",
+    "department": "Warehouse",
+    "shift": "Day",
+    "used": [
+      "Staff car park"
+    ],
+    "text": "The buddy system made my first month much easier."
+  },
+  {
+    "submittedAt": "2026-10-08T18:10:00.000Z",
+    "name": "Kanya H.",
+    "department": "Warehouse",
+    "shift": "Day",
+    "used": [
+      "Staff car park"
+    ],
+    "text": "Payroll answers my emails, but the numbers are still wrong."
   },
   {
     "submittedAt": "2026-10-09T11:49:00.000Z",
@@ -1527,7 +1527,7 @@
     "used": [
       "Staff car park"
     ],
-    "text": "My manager actually listens when I raise something."
+    "text": "I raised a swap request and nobody replied for three days."
   },
   {
     "submittedAt": "2026-10-09T12:42:00.000Z",
@@ -1537,7 +1537,7 @@
     "used": [
       "Staff car park"
     ],
-    "text": "When I raised the rota problem, my manager fixed it the same day."
+    "text": null
   },
   {
     "submittedAt": "2026-10-09T13:35:00.000Z",
@@ -1545,7 +1545,7 @@
     "department": "Warehouse",
     "shift": "Day",
     "used": [],
-    "text": "My supervisor checks in every week. It helps more than I expected."
+    "text": "Training was rushed but my buddy filled the gaps."
   },
   {
     "submittedAt": "2026-10-09T14:28:00.000Z",
@@ -1553,7 +1553,7 @@
     "department": "Warehouse",
     "shift": "Night",
     "used": [],
-    "text": "My manager actually listens when I raise something."
+    "text": null
   },
   {
     "submittedAt": "2026-10-10T15:21:00.000Z",
@@ -1561,7 +1561,7 @@
     "department": "Operations",
     "shift": "Day",
     "used": [],
-    "text": "My manager is fine, but our one-to-ones keep getting cancelled."
+    "text": null
   },
   {
     "submittedAt": "2026-10-10T16:14:00.000Z",
@@ -1569,7 +1569,7 @@
     "department": "Finance",
     "shift": "Day",
     "used": [],
-    "text": "Nobody has ever explained how overtime is rounded."
+    "text": null
   },
   {
     "submittedAt": "2026-10-10T17:07:00.000Z",
@@ -1577,7 +1577,7 @@
     "department": "Customer service",
     "shift": "Day",
     "used": [],
-    "text": "Night shift overtime is paid a month late."
+    "text": null
   },
   {
     "submittedAt": "2026-10-10T18:00:00.000Z",
@@ -1587,7 +1587,7 @@
     "used": [
       "Buddy scheme"
     ],
-    "text": "Payroll answers my emails, but the numbers are still wrong."
+    "text": null
   },
   {
     "submittedAt": "2026-10-11T09:53:00.000Z",
@@ -1597,7 +1597,7 @@
     "used": [
       "Buddy scheme"
     ],
-    "text": "Overtime on my payslip never matches what I worked."
+    "text": "Getting a swap approved takes days if my supervisor is away."
   },
   {
     "submittedAt": "2026-10-11T10:46:00.000Z",
@@ -1607,7 +1607,7 @@
     "used": [
       "Buddy scheme"
     ],
-    "text": "Swaps are fine if your manager is in, slow if they are on leave."
+    "text": "No comments."
   },
   {
     "submittedAt": "2026-10-11T11:39:00.000Z",
@@ -1617,7 +1617,7 @@
     "used": [
       "Buddy scheme"
     ],
-    "text": "I gave up asking for swaps and just work sick now."
+    "text": "My manager fixed my rota the same day I asked. Really appreciated."
   },
   {
     "submittedAt": "2026-10-11T12:32:00.000Z",
@@ -1627,7 +1627,7 @@
     "used": [
       "Payroll helpdesk"
     ],
-    "text": "Getting a swap approved takes days if my supervisor is away."
+    "text": "Overtime pay is still wrong. I've stopped volunteering for extra shifts."
   },
   {
     "submittedAt": "2026-10-12T13:25:00.000Z",
@@ -1637,7 +1637,7 @@
     "used": [
       "Payroll helpdesk"
     ],
-    "text": "Swapping a shift still means three emails and a phone call."
+    "text": null
   },
   {
     "submittedAt": "2026-10-12T14:18:00.000Z",
@@ -1647,7 +1647,7 @@
     "used": [
       "Payroll helpdesk"
     ],
-    "text": "I waited four days for a swap to be approved."
+    "text": "I avoid asking our team lead questions now."
   },
   {
     "submittedAt": "2026-10-12T15:11:00.000Z",
@@ -1657,40 +1657,7 @@
     "used": [
       "Payroll helpdesk"
     ],
-    "text": "I gave up asking for swaps and just work sick now."
-  },
-  {
-    "submittedAt": "2026-10-13T16:04:00.000Z",
-    "name": "Arthit L.",
-    "department": "Warehouse",
-    "shift": "Night",
-    "used": [
-      "Payroll helpdesk",
-      "Staff car park"
-    ],
-    "text": "There are 40 spaces for 120 people on the morning shift."
-  },
-  {
-    "submittedAt": "2026-10-13T17:57:00.000Z",
-    "name": "Ploy B.",
-    "department": "Operations",
-    "shift": "Night",
-    "used": [
-      "Payroll helpdesk",
-      "Staff car park"
-    ],
-    "text": "I park on the street and walk 15 minutes in the dark."
-  },
-  {
-    "submittedAt": "2026-10-13T18:50:00.000Z",
-    "name": "Nok N.",
-    "department": "Finance",
-    "shift": "Day",
-    "used": [
-      "Payroll helpdesk",
-      "Staff car park"
-    ],
-    "text": "There are 40 spaces for 120 people on the morning shift."
+    "text": null
   },
   {
     "submittedAt": "2026-10-13T09:43:00.000Z",
@@ -1701,7 +1668,40 @@
       "Payroll helpdesk",
       "Staff car park"
     ],
-    "text": "Feedback from our team lead is personal, not about the work."
+    "text": null
+  },
+  {
+    "submittedAt": "2026-10-13T16:04:00.000Z",
+    "name": "Arthit L.",
+    "department": "Warehouse",
+    "shift": "Night",
+    "used": [
+      "Payroll helpdesk",
+      "Staff car park"
+    ],
+    "text": "Night shift overtime is paid a month late."
+  },
+  {
+    "submittedAt": "2026-10-13T17:57:00.000Z",
+    "name": "Ploy B.",
+    "department": "Operations",
+    "shift": "Night",
+    "used": [
+      "Payroll helpdesk",
+      "Staff car park"
+    ],
+    "text": null
+  },
+  {
+    "submittedAt": "2026-10-13T18:50:00.000Z",
+    "name": "Nok N.",
+    "department": "Finance",
+    "shift": "Day",
+    "used": [
+      "Payroll helpdesk",
+      "Staff car park"
+    ],
+    "text": "First week was great, but nobody showed me the HR system."
   },
   {
     "submittedAt": "2026-10-14T10:36:00.000Z",
@@ -1712,7 +1712,7 @@
       "Payroll helpdesk",
       "Staff car park"
     ],
-    "text": "The buddy system made my first month much easier."
+    "text": "My manager is hard to reach on night shifts."
   },
   {
     "submittedAt": "2026-10-14T11:29:00.000Z",
@@ -1723,7 +1723,7 @@
       "Payroll helpdesk",
       "Staff car park"
     ],
-    "text": "First week was great, but nobody showed me the HR system."
+    "text": null
   },
   {
     "submittedAt": "2026-10-14T12:22:00.000Z",
@@ -1734,7 +1734,7 @@
       "Payroll helpdesk",
       "Staff car park"
     ],
-    "text": "Training was rushed; I learned the system from a colleague."
+    "text": null
   },
   {
     "submittedAt": "2026-10-14T13:15:00.000Z",
@@ -1745,7 +1745,7 @@
       "Payroll helpdesk",
       "Staff car park"
     ],
-    "text": "My supervisor checks in every week. It helps more than I expected."
+    "text": "Overtime on my payslip never matches what I worked."
   },
   {
     "submittedAt": "2026-10-15T14:08:00.000Z",
@@ -1756,7 +1756,7 @@
       "Payroll helpdesk",
       "Staff car park"
     ],
-    "text": "My manager actually listens when I raise something."
+    "text": null
   },
   {
     "submittedAt": "2026-10-15T15:01:00.000Z",
@@ -1767,7 +1767,7 @@
       "Payroll helpdesk",
       "Staff car park"
     ],
-    "text": "When I raised the rota problem, my manager fixed it the same day."
+    "text": "Who do I ask about overtime that was never paid?"
   },
   {
     "submittedAt": "2026-10-15T16:54:00.000Z",
@@ -1778,7 +1778,7 @@
       "Payroll helpdesk",
       "Staff car park"
     ],
-    "text": "My supervisor checks in every week. It helps more than I expected."
+    "text": null
   },
   {
     "submittedAt": "2026-10-15T17:47:00.000Z",
@@ -1788,7 +1788,37 @@
     "used": [
       "Payroll helpdesk"
     ],
-    "text": "My manager is fine, but our one-to-ones keep getting cancelled."
+    "text": "My supervisor checks in every week. It helps more than I expected."
+  },
+  {
+    "submittedAt": "2026-10-16T09:33:00.000Z",
+    "name": "Tawan D.",
+    "department": "Finance",
+    "shift": "Night",
+    "used": [
+      "Shift swap form"
+    ],
+    "text": null
+  },
+  {
+    "submittedAt": "2026-10-16T10:26:00.000Z",
+    "name": "Fah L.",
+    "department": "Customer service",
+    "shift": "Day",
+    "used": [
+      "Shift swap form"
+    ],
+    "text": "Swaps are okay at the moment."
+  },
+  {
+    "submittedAt": "2026-10-16T11:19:00.000Z",
+    "name": "Arthit B.",
+    "department": "Customer service",
+    "shift": "Day",
+    "used": [
+      "Shift swap form"
+    ],
+    "text": "Payroll keeps saying it will be fixed next month."
   },
   {
     "submittedAt": "2026-10-16T18:40:00.000Z",
@@ -1799,37 +1829,7 @@
       "Shift swap form",
       "Payroll helpdesk"
     ],
-    "text": "My manager is hard to reach on night shifts."
-  },
-  {
-    "submittedAt": "2026-10-16T09:33:00.000Z",
-    "name": "Tawan D.",
-    "department": "Finance",
-    "shift": "Night",
-    "used": [
-      "Shift swap form"
-    ],
-    "text": "Payroll fixed my missing overtime the same week."
-  },
-  {
-    "submittedAt": "2026-10-16T10:26:00.000Z",
-    "name": "Fah L.",
-    "department": "Customer service",
-    "shift": "Day",
-    "used": [
-      "Shift swap form"
-    ],
-    "text": "Nobody has ever explained how overtime is rounded."
-  },
-  {
-    "submittedAt": "2026-10-16T11:19:00.000Z",
-    "name": "Arthit B.",
-    "department": "Customer service",
-    "shift": "Day",
-    "used": [
-      "Shift swap form"
-    ],
-    "text": "Night shift overtime is paid a month late."
+    "text": "My manager actually listens when I raise something."
   },
   {
     "submittedAt": "2026-10-17T12:12:00.000Z",
@@ -1839,7 +1839,7 @@
     "used": [
       "Shift swap form"
     ],
-    "text": "Payroll answers my emails, but the numbers are still wrong."
+    "text": "Is the swap form changing? I heard something about two signatures."
   },
   {
     "submittedAt": "2026-10-17T13:05:00.000Z",
@@ -1849,7 +1849,7 @@
     "used": [
       "Shift swap form"
     ],
-    "text": "Overtime on my payslip never matches what I worked."
+    "text": "Swapping a shift still means three emails and a phone call."
   },
   {
     "submittedAt": "2026-10-17T14:58:00.000Z",
@@ -1859,7 +1859,7 @@
     "used": [
       "Shift swap form"
     ],
-    "text": "My team lead approved my swap within the hour this time."
+    "text": "Swap went through the same day. Easy."
   },
   {
     "submittedAt": "2026-10-17T15:51:00.000Z",
@@ -1869,7 +1869,7 @@
     "used": [
       "Shift swap form"
     ],
-    "text": "Swaps are fine if your manager is in, slow if they are on leave."
+    "text": null
   },
   {
     "submittedAt": "2026-10-18T16:44:00.000Z",
@@ -1879,7 +1879,7 @@
     "used": [
       "Shift swap form"
     ],
-    "text": "Swapping a shift still means three emails and a phone call."
+    "text": null
   },
   {
     "submittedAt": "2026-10-18T17:37:00.000Z",
@@ -1889,7 +1889,7 @@
     "used": [
       "Shift swap form"
     ],
-    "text": "I waited four days for a swap to be approved."
+    "text": "September overtime is missing from my payslip completely."
   },
   {
     "submittedAt": "2026-10-18T18:30:00.000Z",
@@ -1899,7 +1899,7 @@
     "used": [
       "Shift swap form"
     ],
-    "text": "I gave up asking for swaps and just work sick now."
+    "text": "My buddy was really helpful."
   },
   {
     "submittedAt": "2026-10-19T09:23:00.000Z",
@@ -1910,7 +1910,7 @@
       "Shift swap form",
       "Buddy scheme"
     ],
-    "text": "Getting a swap approved takes days if my supervisor is away."
+    "text": "The new swap process needs both supervisors to sign off, and on nights one of them is always off. I asked to swap my Thursday on the 12th and it was approved on the 21st, two days after the shift had already happened. I worked it anyway, sick, because I couldn't risk an absence on my record."
   },
   {
     "submittedAt": "2026-10-19T10:16:00.000Z",
@@ -1922,7 +1922,7 @@
       "Buddy scheme",
       "Staff car park"
     ],
-    "text": "Swapping a shift still means three emails and a phone call. The new bike racks at the new site are a nice touch."
+    "text": "Parking at the new site is impossible after 7am."
   },
   {
     "submittedAt": "2026-10-19T11:09:00.000Z",
@@ -1934,7 +1934,7 @@
       "Buddy scheme",
       "Staff car park"
     ],
-    "text": "I waited four days for a swap to be approved. Parking is fine after 10, but the morning shift has nowhere to go."
+    "text": "Got the back pay for September's overtime. Took a while but it's sorted."
   },
   {
     "submittedAt": "2026-10-20T12:02:00.000Z",
@@ -1946,7 +1946,7 @@
       "Buddy scheme",
       "Staff car park"
     ],
-    "text": "Parking is fine after 10, but the morning shift has nowhere to go."
+    "text": "Onboarding for the new site was clear and quick."
   },
   {
     "submittedAt": "2026-10-20T13:55:00.000Z",
@@ -1957,7 +1957,7 @@
       "Shift swap form",
       "Staff car park"
     ],
-    "text": "There are 40 spaces for 120 people on the morning shift."
+    "text": "My manager is fine, but our one-to-ones keep getting cancelled."
   },
   {
     "submittedAt": "2026-10-20T14:48:00.000Z",
@@ -1968,7 +1968,7 @@
       "Shift swap form",
       "Staff car park"
     ],
-    "text": "I park on the street and walk 15 minutes in the dark."
+    "text": null
   },
   {
     "submittedAt": "2026-10-20T15:41:00.000Z",
@@ -1979,40 +1979,7 @@
       "Shift swap form",
       "Staff car park"
     ],
-    "text": "There are 40 spaces for 120 people on the morning shift."
-  },
-  {
-    "submittedAt": "2026-10-21T16:34:00.000Z",
-    "name": "Arthit N.",
-    "department": "Operations",
-    "shift": "Day",
-    "used": [
-      "Shift swap form",
-      "Staff car park"
-    ],
-    "text": "I park on the street and walk 15 minutes in the dark."
-  },
-  {
-    "submittedAt": "2026-10-21T17:27:00.000Z",
-    "name": "Ploy C.",
-    "department": "Finance",
-    "shift": "Day",
-    "used": [
-      "Shift swap form",
-      "Staff car park"
-    ],
-    "text": "I avoid asking our team lead questions now."
-  },
-  {
-    "submittedAt": "2026-10-21T18:20:00.000Z",
-    "name": "Nok R.",
-    "department": "Customer service",
-    "shift": "Night",
-    "used": [
-      "Shift swap form",
-      "Staff car park"
-    ],
-    "text": "The buddy system made my first month much easier."
+    "text": "Still waiting on overtime from August."
   },
   {
     "submittedAt": "2026-10-21T09:13:00.000Z",
@@ -2023,7 +1990,40 @@
       "Shift swap form",
       "Staff car park"
     ],
-    "text": "The buddy system made my first month much easier."
+    "text": "Shift swaps take far too long now. Please go back to the old form."
+  },
+  {
+    "submittedAt": "2026-10-21T16:34:00.000Z",
+    "name": "Arthit N.",
+    "department": "Operations",
+    "shift": "Day",
+    "used": [
+      "Shift swap form",
+      "Staff car park"
+    ],
+    "text": "I waited four days for a swap to be approved. Parking is fine after 10, but the morning shift has nowhere to go."
+  },
+  {
+    "submittedAt": "2026-10-21T17:27:00.000Z",
+    "name": "Ploy C.",
+    "department": "Finance",
+    "shift": "Day",
+    "used": [
+      "Shift swap form",
+      "Staff car park"
+    ],
+    "text": "Swaps are broken now."
+  },
+  {
+    "submittedAt": "2026-10-21T18:20:00.000Z",
+    "name": "Nok R.",
+    "department": "Customer service",
+    "shift": "Night",
+    "used": [
+      "Shift swap form",
+      "Staff car park"
+    ],
+    "text": "Who approves swaps when both supervisors are on leave? Nobody, apparently."
   },
   {
     "submittedAt": "2026-10-22T10:06:00.000Z",
@@ -2033,7 +2033,7 @@
     "used": [
       "Shift swap form"
     ],
-    "text": "First week was great, but nobody showed me the HR system."
+    "text": "Overtime was paid on time this month, first time since I started."
   },
   {
     "submittedAt": "2026-10-22T11:59:00.000Z",
@@ -2043,7 +2043,7 @@
     "used": [
       "Shift swap form"
     ],
-    "text": "When I raised the rota problem, my manager fixed it the same day."
+    "text": "Moved to the new site on Monday. The building is lovely but there is nowhere to park, and the bus from the station only runs every 40 minutes, so I was late twice this week through no fault of my own. Could we get a shuttle or reserved spaces for shift workers?"
   },
   {
     "submittedAt": "2026-10-22T12:52:00.000Z",
@@ -2053,7 +2053,7 @@
     "used": [
       "Shift swap form"
     ],
-    "text": "My supervisor checks in every week. It helps more than I expected."
+    "text": "My manager actually listens when I raise something."
   },
   {
     "submittedAt": "2026-10-22T13:45:00.000Z",
@@ -2063,7 +2063,7 @@
     "used": [
       "Shift swap form"
     ],
-    "text": "My manager actually listens when I raise something."
+    "text": "Nobody showed me the HR system, again."
   },
   {
     "submittedAt": "2026-10-23T14:38:00.000Z",
@@ -2073,7 +2073,7 @@
     "used": [
       "Shift swap form"
     ],
-    "text": "When I raised the rota problem, my manager fixed it the same day."
+    "text": "I gave up asking for swaps and just work sick now."
   },
   {
     "submittedAt": "2026-10-23T15:31:00.000Z",
@@ -2084,7 +2084,7 @@
       "Shift swap form",
       "Payroll helpdesk"
     ],
-    "text": "My manager is fine, but our one-to-ones keep getting cancelled."
+    "text": "The new overtime breakdown on the payslip finally makes sense."
   },
   {
     "submittedAt": "2026-10-23T16:24:00.000Z",
@@ -2095,7 +2095,7 @@
       "Shift swap form",
       "Payroll helpdesk"
     ],
-    "text": "Nobody has ever explained how overtime is rounded."
+    "text": "Are permits for the new site car park going to be first come, first served?"
   },
   {
     "submittedAt": "2026-10-23T17:17:00.000Z",
@@ -2106,18 +2106,7 @@
       "Shift swap form",
       "Payroll helpdesk"
     ],
-    "text": "Nobody has ever explained how overtime is rounded."
-  },
-  {
-    "submittedAt": "2026-10-24T18:10:00.000Z",
-    "name": "Kanya L.",
-    "department": "Finance",
-    "shift": "Day",
-    "used": [
-      "Shift swap form",
-      "Payroll helpdesk"
-    ],
-    "text": "Night shift overtime is paid a month late."
+    "text": "Three of us had swaps rejected this week with no reason given."
   },
   {
     "submittedAt": "2026-10-24T09:03:00.000Z",
@@ -2128,7 +2117,7 @@
       "Shift swap form",
       "Payroll helpdesk"
     ],
-    "text": "Payroll answers my emails, but the numbers are still wrong."
+    "text": "Since the new two-signature rule, a swap takes a week. It used to take a day."
   },
   {
     "submittedAt": "2026-10-24T10:56:00.000Z",
@@ -2139,7 +2128,7 @@
       "Shift swap form",
       "Payroll helpdesk"
     ],
-    "text": "Overtime on my payslip never matches what I worked."
+    "text": "I park on the street and walk 15 minutes in the dark after a night shift. It doesn't feel safe."
   },
   {
     "submittedAt": "2026-10-24T11:49:00.000Z",
@@ -2150,7 +2139,18 @@
       "Shift swap form",
       "Payroll helpdesk"
     ],
-    "text": "My team lead approved my swap within the hour this time."
+    "text": "Swap requests sat in the inbox all week."
+  },
+  {
+    "submittedAt": "2026-10-24T18:10:00.000Z",
+    "name": "Kanya L.",
+    "department": "Finance",
+    "shift": "Day",
+    "used": [
+      "Shift swap form",
+      "Payroll helpdesk"
+    ],
+    "text": null
   },
   {
     "submittedAt": "2026-10-25T12:42:00.000Z",
@@ -2161,7 +2161,7 @@
       "Shift swap form",
       "Payroll helpdesk"
     ],
-    "text": "Swaps are fine if your manager is in, slow if they are on leave."
+    "text": "There are 40 spaces for 120 people on the morning shift at the new site."
   },
   {
     "submittedAt": "2026-10-25T13:35:00.000Z",
@@ -2173,7 +2173,7 @@
       "Payroll helpdesk",
       "Staff car park"
     ],
-    "text": "I gave up asking for swaps and just work sick now."
+    "text": "Is there a way to see where my swap request is in the queue?"
   },
   {
     "submittedAt": "2026-10-25T14:28:00.000Z",
@@ -2185,7 +2185,7 @@
       "Payroll helpdesk",
       "Staff car park"
     ],
-    "text": "Getting a swap approved takes days if my supervisor is away."
+    "text": "He says people over 50 should just retire instead of asking for training. I'm 54 and I asked for training last week. I don't know who I'm supposed to report this to when the person saying it is my team lead."
   },
   {
     "submittedAt": "2026-10-25T15:21:00.000Z",
@@ -2197,10 +2197,10 @@
       "Payroll helpdesk",
       "Staff car park"
     ],
-    "text": "Swapping a shift still means three emails and a phone call."
+    "text": null
   },
   {
-    "submittedAt": "2026-10-26T16:14:00.000Z",
+    "submittedAt": "2026-10-25T19:15:00.000Z",
     "name": "Anan K.",
     "department": "Customer service",
     "shift": "Day",
@@ -2209,10 +2209,10 @@
       "Payroll helpdesk",
       "Staff car park"
     ],
-    "text": "I waited four days for a swap to be approved."
+    "text": null
   },
   {
-    "submittedAt": "2026-10-26T17:07:00.000Z",
+    "submittedAt": "2026-10-25T20:15:00.000Z",
     "name": "Malee P.",
     "department": "Warehouse",
     "shift": "Day",
@@ -2221,10 +2221,10 @@
       "Payroll helpdesk",
       "Staff car park"
     ],
-    "text": "I gave up asking for swaps and just work sick now."
+    "text": "Payroll fixed my missing overtime the same week. Thank you!"
   },
   {
-    "submittedAt": "2026-10-26T18:00:00.000Z",
+    "submittedAt": "2026-10-25T21:15:00.000Z",
     "name": "Somchai J.",
     "department": "Warehouse",
     "shift": "Day",
@@ -2233,6 +2233,6 @@
       "Payroll helpdesk",
       "Staff car park"
     ],
-    "text": "Getting a swap approved takes days if my supervisor is away."
+    "text": "My supervisor checks in every week, even after the move."
   }
 ]
