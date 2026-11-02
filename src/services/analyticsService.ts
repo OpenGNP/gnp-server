@@ -200,6 +200,7 @@ export type FormTrend = {
   /** Per charted topic: mentions + sentiment over the whole window (side panel default). */
   topicSummaries: TrendTopicSummary[];
   sentimentSeries: TrendSentimentPoint[];
+  responseCounts: number[];
   /** null = the range doesn't hold two complete periods with feedback. */
   whatChanged: WhatChanged | null;
   /** Each topic's biggest spike, biggest first; `bucketIndex` indexes `volumeSeries`. */
@@ -1175,6 +1176,7 @@ export const analyticsService = {
       topicSentimentSeries: {},
       topicSummaries: [],
       sentimentSeries: [],
+      responseCounts: [],
       whatChanged: null,
       timelineEvents: [],
     };
@@ -1386,6 +1388,25 @@ export const analyticsService = {
       return { label: cal.label(k, bkt), negative, neutral, positive: 100 - negative - neutral, counts };
     });
 
+    // Responses per bucket, under the same demographic filter as everything else.
+    const responseRows = await db
+      .select({ id: submissions.id, createdAt: submissions.createdAt })
+      .from(submissions)
+      .where(
+        and(
+          eq(submissions.formId, formId),
+          isNotNull(submissions.createdAt),
+          gte(submissions.createdAt, new Date(from).toISOString()),
+          lte(submissions.createdAt, new Date(to).toISOString()),
+        ),
+      );
+    const responseCounts = bucketKeys.map(() => 0);
+    for (const row of responseRows) {
+      if (isFiltering && !matchesDemo(row.id)) continue;
+      const t = parseTs(row.createdAt as string);
+      if (!Number.isNaN(t)) responseCounts[idxFor(t)]! += 1;
+    }
+
     // Timeline: a topic's count in a bucket that is ≥ SPIKE_MIN_COUNT and at least
     // SPIKE_MIN_ABOVE above its average over the earlier buckets. Newest first.
     const spikes: FormTrend["timelineEvents"] = [];
@@ -1431,6 +1452,7 @@ export const analyticsService = {
       topicSentimentSeries,
       topicSummaries,
       sentimentSeries,
+      responseCounts,
       whatChanged,
       timelineEvents,
     };
