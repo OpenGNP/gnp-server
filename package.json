@@ -10,6 +10,7 @@
     "seed": "bun run src/seed/seed.ts",
     "seed:dashboard": "bun run src/seed/dashboardSeed.ts",
     "seed:demo": "bun run src/seed/demoSeed.ts",
+    "demo:snapshot": "bun run src/seed/demoSnapshot.ts",
     "generate": "bunx drizzle-kit generate",
     "pull": "bunx drizzle-kit pull",
     "push": "bunx drizzle-kit push"
