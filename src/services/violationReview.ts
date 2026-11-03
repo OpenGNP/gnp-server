@@ -8,7 +8,7 @@ import { requireFormAccess } from "./formAccess";
  * What every badge and count uses: flagged by the AI and not dismissed by a reviewer,
  * or confirmed by one (even if a later AI run unflags it).
  */
-export const activeViolationSql = sql<boolean>`((${points.isViolation} is true and ${points.violationReviewedStatus} is distinct from 'dismissed') or ${points.violationReviewedStatus} = 'confirmed')`;
+export const activeViolationSql = sql<boolean>`((${points.violationStatus} in ('possible', 'violation') and ${points.violationReviewedStatus} is distinct from 'dismissed') or ${points.violationReviewedStatus} = 'confirmed')`;
 
 export type ViolationReview = "confirmed" | "dismissed" | null;
 
@@ -20,7 +20,6 @@ export async function reviewPointViolation(pointId: number, userId: number, revi
   const [point] = await db
     .select({
       formId: submissions.formId,
-      isViolation: points.isViolation,
       aiStatus: points.violationStatus,
       reviewed: points.violationReviewedStatus,
     })
@@ -31,7 +30,8 @@ export async function reviewPointViolation(pointId: number, userId: number, revi
     .limit(1);
   if (!point) throw notFound("Feedback point not found");
   await requireFormAccess(point.formId, userId, "edit");
-  if (!point.isViolation && point.reviewed === null) throw badRequest("Only points flagged as a possible violation can be reviewed");
+  const aiFlagged = point.aiStatus === "possible" || point.aiStatus === "violation";
+  if (!aiFlagged && point.reviewed === null) throw badRequest("Only points flagged as a possible violation can be reviewed");
 
   await db
     .update(points)
@@ -42,7 +42,7 @@ export async function reviewPointViolation(pointId: number, userId: number, revi
     )
     .where(eq(points.id, pointId));
 
-  return reviewedState(review, Boolean(point.isViolation), point.aiStatus);
+  return reviewedState(review, aiFlagged, point.aiStatus);
 }
 
 /** How a point reads after a review, so the client can show it without a refetch (undo included). */

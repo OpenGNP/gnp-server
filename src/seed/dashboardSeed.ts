@@ -596,7 +596,7 @@ async function main() {
         canonicalTopicId: topicId ?? null,
         pointText: entry.text,
         sentimentLabel: entry.sentiment,
-        isViolation: entry.violation ?? false,
+        violationStatus: entry.violation ? "violation" : "none",
         assignmentConfidence: topicId ? 0.7 + Math.random() * 0.29 : null,
         processingStatus: topicId ? "assigned" : "unknown",
         createdAt: submittedAt,

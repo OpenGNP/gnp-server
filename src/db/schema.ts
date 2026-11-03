@@ -303,7 +303,6 @@ export const points = pgTable("points", {
 	pointText: text("point_text").notNull(),
 	embedding: vector({ dimensions: 384 }),
 	sentimentLabel: varchar("sentiment_label", { length: 20 }),
-	isViolation: boolean("is_violation"),
 	assignmentConfidence: real("assignment_confidence"),
 	processingStatus: varchar("processing_status", { length: 20 }).default('pending').notNull(),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).default(sql`CURRENT_TIMESTAMP`),
@@ -336,8 +335,7 @@ export const points = pgTable("points", {
 	check("chk_processing", sql`(processing_status)::text = ANY (ARRAY[('pending'::character varying)::text, ('assigned'::character varying)::text, ('unknown'::character varying)::text, ('clustered'::character varying)::text])`),
 	check("chk_status_topic", sql`((processing_status)::text = 'assigned'::text) = (canonical_topic_id IS NOT NULL)`),
 	check("chk_violation_reviewed_status", sql`(violation_reviewed_status)::text = ANY (ARRAY[('none'::character varying)::text, ('possible'::character varying)::text, ('violation'::character varying)::text, ('confirmed'::character varying)::text, ('dismissed'::character varying)::text])`),
-	check("chk_labels_together", sql`(sentiment_label IS NULL) = (is_violation IS NULL)`),
-	check("chk_violation_status", sql`(violation_status)::text = ANY ((ARRAY['none'::character varying, 'possible'::character varying, 'violation'::character varying, 'confirmed'::character varying, 'dismissed'::character varying])::text[])`),
+	check("chk_violation_status", sql`(violation_status)::text = ANY ((ARRAY['none'::character varying, 'possible'::character varying, 'violation'::character varying])::text[])`),
 	check("chk_violation_type", sql`(violation_type)::text = ANY ((ARRAY['none'::character varying, 'legal'::character varying, 'moral'::character varying, 'ethics'::character varying])::text[])`),
 ]);
 

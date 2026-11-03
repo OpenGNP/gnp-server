@@ -306,7 +306,7 @@ async function insertGettingStartedForm(owner: Owner) {
             canonicalTopicId: point.topic ? topicId(point.topic) : null,
             pointText: point.text,
             sentimentLabel: point.sentiment,
-            isViolation: point.violation ?? false,
+            violationStatus: point.violation ? "violation" : "none",
             assignmentConfidence: point.topic ? 0.9 : null,
             processingStatus: point.topic ? "assigned" : "unknown",
             createdAt: response.at,
