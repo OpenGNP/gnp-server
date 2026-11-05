@@ -495,7 +495,7 @@ function parseKeywords(raw: string | null): ThemeKeyword[] {
  * answer to every non-empty entry is one of them.
  */
 async function loadDemographics(formId: number, demo: Record<string, string[]> | undefined) {
-  // The respondent's demographic answers per submission — whatever single-choice
+  // The respondent's demographic answers per submission — whatever choice
   // questions this form's demographic section has (Year, Department, Age, …), kept
   // generic and in form order rather than mapped to fixed slots.
   const demoRows = await db
@@ -513,7 +513,7 @@ async function loadDemographics(formId: number, demo: Record<string, string[]> |
       and(
         eq(formFields.formId, formId),
         eq(formFields.section, "demographic"),
-        eq(formFields.fieldType, "radio"),
+        inArray(formFields.fieldType, ["radio", "checkbox"]),
       ),
     );
 
@@ -521,7 +521,8 @@ async function loadDemographics(formId: number, demo: Record<string, string[]> |
   const demoBySubmission = new Map<number, DemoAnswer[]>();
   for (const row of demoRows) {
     const list = demoBySubmission.get(row.submissionId) ?? [];
-    if (list.some((entry) => entry.fieldId === row.fieldId)) continue; // one answer per radio field
+    // Checkbox fields add one entry per ticked option.
+    if (list.some((entry) => entry.fieldId === row.fieldId && entry.value === row.option)) continue;
     list.push({
       fieldId: row.fieldId,
       order: row.order ?? 0,
@@ -558,7 +559,7 @@ async function loadDemographics(formId: number, demo: Record<string, string[]> |
       and(
         eq(formFields.formId, formId),
         eq(formFields.section, "demographic"),
-        eq(formFields.fieldType, "radio"),
+        inArray(formFields.fieldType, ["radio", "checkbox"]),
       ),
     )
     .orderBy(formFields.fieldOrder, fieldOptions.optionOrder);

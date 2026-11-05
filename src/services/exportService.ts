@@ -272,7 +272,10 @@ async function loadThemesTables(formId: number, adminId: number, opts: ThemesExp
     localDate(point.submittedAt, timeZone),
     responseNumber.get(point.submissionId) ?? "",
     ...(withNames ? [point.respondentName ?? ""] : []),
-    ...demoLabels.map((label) => point.demographics.find((demo) => demo.label === label)?.value ?? ""),
+    ...demoLabels.map((label) => point.demographics
+        .filter((demo) => demo.label === label)
+        .map((demo) => demo.value)
+        .join(", ")),
   ]);
 
   return {
