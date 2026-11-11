@@ -284,7 +284,7 @@ async function loadThemesTables(formId: number, adminId: number, opts: ThemesExp
       headers: [
         "Topic",
         "Mentions",
-        "% of total",
+        "Weight (% of all mentions)",
         "Negative",
         "Negative %",
         "Neutral",
