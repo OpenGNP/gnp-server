@@ -234,7 +234,7 @@ async function loadThemesTables(formId: number, adminId: number, opts: ThemesExp
     ["Topics sorted by", `${TOPIC_SORTS[opts.sort].label}${pinViolations ? " (violations first)" : ""}`],
     ["Exported at", formatLocal(new Date().toISOString(), timeZone)],
     ["Responders in range", themes.totalResponders],
-    ["Analysed feedback", analysed],
+    ["Mentions analysed", analysed],
     ["Negative", share(negative, analysed)],
     ["Neutral", share(neutral, analysed)],
     ["Positive", share(positive, analysed)],
