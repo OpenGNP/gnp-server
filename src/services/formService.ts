@@ -401,6 +401,7 @@ export const formService = {
         urlId: forms.urlId,
         formTitle: forms.formTitle,
         formDescription: forms.formDescription,
+        coverImageUrl: forms.coverImageUrl,
         status: forms.status,
         accessType: forms.accessType,
         folderId: forms.folderId,

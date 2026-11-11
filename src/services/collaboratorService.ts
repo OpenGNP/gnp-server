@@ -89,6 +89,7 @@ export const collaboratorService = {
         id: forms.id,
         urlId: forms.urlId,
         formTitle: forms.formTitle,
+        coverImageUrl: forms.coverImageUrl,
         status: forms.status,
         updatedAt: forms.updatedAt,
         ownerName: sql<string | null>`coalesce(nullif(${users.fullName}, ''), ${users.email})`,
